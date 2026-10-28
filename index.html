@@ -480,6 +480,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .mchip b { font-size: 12px; }
 .hteams { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .hk { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.zone { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--surface-2); }
+.zlabel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-weight: 700; font-size: 14px; color: var(--accent); }
+.zlabel small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.editbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent); background: rgba(247, 154, 36, .1); font-size: 13px; }
+.hby { font-size: 11px; color: var(--muted); }
+.hacts { display: flex; flex-direction: column; gap: 6px; align-self: center; margin-right: 10px; }
+.hacts .del { margin: 0; }
 .hnote { font-size: 12px; color: var(--muted); }
 .hrow .del { align-self: center; margin-right: 10px; }
 @media (max-width: 640px) {
@@ -640,8 +647,9 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
           <div class="field"><span class="label">マップ</span><select id="map" hidden></select><button type="button" class="mapbtn" id="mapBtn"></button></div>
           <div class="field"><span class="label">日付</span><div class="dateview" id="date" aria-live="polite"></div></div>
         </div>
-        <div class="field">
-          <span class="label">参加メンバー・使ったヒーロー・ランク変動</span>
+        <div class="editbar" id="editBar" hidden><span>この試合を編集中(スクワッドのだれでも直せます)</span><button type="button" class="ghost" id="editCancel">やめる</button></div>
+        <div class="field zone">
+          <span class="zlabel">フレンド<small>いっしょに遊んだ仲間・使ったヒーロー・ランク変動</small></span>
           <div class="members" id="members"></div>
           <div class="addmem">
             <input type="text" id="memName" placeholder="名前を入力して追加" maxlength="24">
@@ -650,8 +658,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
           <div class="known" id="known"></div>
           <p class="hint">ランク戦では、試合後に出る「+25%」「−20%」などを入れると、そのメンバーの現在ランクが自動で上下します。</p>
         </div>
-        <div class="field">
-          <span class="label">味方のヒーロー(フレンド以外)</span>
+        <div class="field zone">
+          <span class="zlabel">フレンド以外の味方<small>野良でいっしょになった人のヒーロー</small></span>
           <div class="enemies" id="allies"></div>
           <button type="button" class="ghost pickbtn" id="allyPick">＋ 味方のヒーローを選ぶ</button>
         </div>
@@ -1158,7 +1166,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   let db = null, col = null, pcol = null, canWrite = true;
   let auth = null, authUser = null, me = null, nameEditing = false;
   let matches = [], players = {};
-  let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null;
+  let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null, editingMatch = null;
   const form = { result: null, queue: "ランク", members: [], enemies: [], allies: [] };
 
   // ---- フォーム
@@ -1383,17 +1391,27 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       enemies: form.enemies.slice(0, 6),
       allies: form.allies.slice(0, allyMax()),
       ...(authUser && myName() ? { uids: [authUser.uid] } : {}),
-      note: $("note").value.trim().slice(0, 80), createdAt: Date.now(),
+      note: $("note").value.trim().slice(0, 80), createdAt: Date.now(), by: myName() || "",
     };
     if (doc.uids) doc.members = doc.members.map(x => x.name === myName() ? { ...x, uid: authUser.uid } : x);
+    const old = editingMatch;
+    if (old) {
+      // 編集: 日付・作成時刻・記録した人はそのまま。ランクは前の変動を戻してから新しい変動を当てる
+      const keepUid = x => { const o = (old.members || []).find(y => y.name === x.name && y.uid); return o && !x.uid ? { ...x, uid: o.uid } : x; };
+      doc.members = doc.members.map(keepUid);
+      doc.uids = [...new Set([...(old.uids || []), ...(doc.uids || [])])];
+      Object.assign(doc, { date: old.date, createdAt: old.createdAt || Date.now(), by: old.by || "", editedBy: myName() || "", editedAt: Date.now() });
+    }
     $("submit").disabled = true;
     try {
-      await col.add(doc); gMatches = null;
+      if (old) await col.doc(old.id).set(doc); else await col.add(doc);
+      gMatches = null;
       let notes = [];
-      try { notes = await applyRankChanges(doc.members, 1); } catch (err) {}
+      try { if (old) await applyRankChanges(old.members || [], -1); notes = await applyRankChanges(doc.members, 1); } catch (err) {}
       lsSet("ow-last-members", JSON.stringify(form.members.map(m => ({ name: m.name, hero: m.hero, role: m.role }))));
       lsSet("ow-last-queue", form.queue);
-      $("toast").textContent = `記録しました: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "");
+      $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "");
+      if (old) endEdit();
       form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
       form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips();
     } catch (err) {
@@ -1878,16 +1896,39 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         <span class="hart">${mapArt(m.map)}</span>
         <div class="hmain">
           <div class="htop"><b>${esc(m.map)}</b><span class="hmeta">${esc(m.date)} · ${esc(m.queue)}</span></div>
-          <div class="hmem">${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}%</b>` : ""}</span>`).join("")}</div>
-          ${(m.allies || []).length || (m.enemies || []).length ? `<div class="hteams">${(m.allies || []).length ? `<span class="hk">味方</span><span class="mini">${mini(m.allies)}</span>` : ""}${(m.enemies || []).length ? `<span class="hk">相手</span><span class="mini">${mini(m.enemies)}</span>` : ""}</div>` : ""}
+          <div class="hmem"><span class="hk">フレンド</span>${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}%</b>` : ""}</span>`).join("")}</div>
+          ${(m.allies || []).length || (m.enemies || []).length ? `<div class="hteams">${(m.allies || []).length ? `<span class="hk">野良の味方</span><span class="mini">${mini(m.allies)}</span>` : ""}${(m.enemies || []).length ? `<span class="hk">相手</span><span class="mini">${mini(m.enemies)}</span>` : ""}</div>` : ""}
           ${m.note ? `<div class="hnote">${esc(m.note)}</div>` : ""}
+          ${m.by || m.editedBy ? `<div class="hby">${m.by ? `記録: <span class="nt">${esc(m.by)}</span>` : ""}${m.editedBy ? ` · 編集: <span class="nt">${esc(m.editedBy)}</span>` : ""}</div>` : ""}
         </div>
-        ${isSample || !canWrite ? "" : `<button class="del${pendingDel === m.id ? " confirm" : ""}" data-del="${esc(m.id)}">${pendingDel === m.id ? "本当に消す" : "削除"}</button>`}
+        ${isSample || !canWrite ? "" : `<div class="hacts"><button class="del" data-edit-m="${esc(m.id)}">編集</button><button class="del${pendingDel === m.id ? " confirm" : ""}" data-del="${esc(m.id)}">${pendingDel === m.id ? "本当に消す" : "削除"}</button></div>`}
       </article>`).join("") : `<div class="empty">記録がありません</div>`;
     $("more").hidden = rows.length <= shown;
   }
   $("more").addEventListener("click", () => { shown += 15; render(); });
+  // 記録した試合を記録フォームに読み込んで直す
+  function startEdit(m) {
+    editingMatch = m;
+    form.result = m.result; setPressed($("resultSeg"), m.result);
+    form.queue = QUEUES.includes(m.queue) ? m.queue : form.queue; syncQueue();
+    if (m.map) setMap(m.map);
+    form.members = (m.members || []).slice(0, 6).map(x => ({ name: x.name, hero: x.hero || "", role: x.role || "", dir: x.delta < 0 ? -1 : 1, amt: x.delta ? String(Math.abs(x.delta)) : "" }));
+    form.enemies = (m.enemies || []).slice(0, 6); form.allies = (m.allies || []).slice(0, 6);
+    $("note").value = m.note || "";
+    $("editBar").hidden = false; $("submit").textContent = "直して保存";
+    renderMembers(); renderEnemyChips(); renderAllyChips(); updateSubmit();
+    if (window.matchMedia("(max-width: 900px)").matches) setPage("team", "add");
+    $("form").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function endEdit() {
+    editingMatch = null; $("editBar").hidden = true; $("submit").textContent = "記録する";
+    form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
+    form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips(); updateSubmit();
+  }
+  $("editCancel").addEventListener("click", endEdit);
   $("rows").addEventListener("click", async e => {
+    const em = e.target.closest("[data-edit-m]");
+    if (em) { const m = matches.find(x => x.id === em.dataset.editM); if (m) startEdit(m); return; }
     const b = e.target.closest("[data-del]"); if (!b || !col) return;
     const id = b.dataset.del;
     if (pendingDel !== id) { pendingDel = id; render(); return; }
@@ -2304,6 +2345,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["コピーしました ✓", "Copied ✓", "복사했습니다 ✓"],
     ["LINEやDiscordに貼り付けて送ってください。開くだけでスクワッドに入れます。", "Paste it in LINE or Discord. Opening it joins the squad.", "LINE이나 Discord에 붙여넣어 보내세요. 열기만 하면 스쿼드에 들어갑니다."],
     ["メンバーを消す", "Remove member", "멤버 삭제"],
+    ["この試合を編集中(スクワッドのだれでも直せます)", "Editing this match (anyone in the squad can fix it)", "이 경기를 수정 중(스쿼드 누구나 고칠 수 있어요)"],
+    ["いっしょに遊んだ仲間・使ったヒーロー・ランク変動", "Friends you played with, heroes and rank changes", "같이 플레이한 친구·사용 영웅·랭크 변동"],
+    ["フレンド以外の味方", "Other teammates", "친구가 아닌 아군"],
+    ["野良でいっしょになった人のヒーロー", "Heroes of random teammates", "랜덤 아군의 영웅"],
+    ["野良の味方", "Randoms", "랜덤 아군"],
+    ["直して保存", "Save changes", "수정 저장"],
+    ["編集", "Edit", "수정"],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
