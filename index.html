@@ -172,6 +172,17 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .rolebadge.tank { background: var(--tank); } .rolebadge.damage { background: var(--damage); } .rolebadge.support { background: var(--support); }
 .tier { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .tier i { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; flex: none; background: var(--c); }
+.rbadge { flex: none; display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+.currank { gap: 8px; }
+.currank .tier b { font-size: 14px; }
+.currank .tier small { color: var(--muted); }
+.currank select { width: auto; padding: 4px 8px; }
+.rk3 { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.rk { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; opacity: .7; }
+.rk.on { opacity: 1; border-color: var(--accent); }
+.rk b { font-size: 12px; white-space: nowrap; }
+.rk small { color: var(--muted); }
+#form:not(.ranked) .currank { display: none; }
 .tier .pg { flex: 1; height: 4px; background: var(--grid); border-radius: 2px; overflow: hidden; min-width: 16px; }
 .tier .pg span { display: block; height: 100%; background: var(--c); }
 .ranks .chg { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12px; text-align: right; white-space: nowrap; }
@@ -588,7 +599,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       <div class="gform">
         <input type="text" id="gInput" maxlength="24" placeholder="スクワッドコード" aria-label="スクワッドコード">
         <button type="button" class="ghost primaryish" id="gJoin">JOIN</button>
-        <button type="button" class="ghost" id="gInvite" hidden>招待リンク</button>
+        <button type="button" class="ghost primaryish" id="gInvite" hidden>招待リンクをコピー</button>
         <button type="button" class="ghost" id="gLeave" hidden>LEAVE</button>
       </div>
       <div class="mygroups" id="myGroups" hidden></div>
@@ -1096,6 +1107,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const fromTotal = t => { t = Math.max(0, Math.min(MAX_TOTAL, Math.round(t))); const tier = Math.floor(t / 500), rem = t % 500; return { tier, div: 5 - Math.floor(rem / 100), pct: rem % 100 }; };
   const validRank = r => r && Number.isInteger(r.tier) && r.tier >= 0 && r.tier < TIERS.length && r.div >= 1 && r.div <= 5;
   const rankLabel = r => `${TIERS[r.tier][0]} ${r.div}`;
+  // ランクのバッジ(コードで描く盾形。ティアの色、マスター以上は翼、真ん中にディビジョン1〜5)
+  const rankBadge = (r, s = 30) => {
+    const c = TIERS[r.tier][1], hi = r.tier >= 5;
+    const wings = hi ? `<path d="M5 14 L0 10 L1 20 L5 24 Z M35 14 L40 10 L39 20 L35 24 Z" fill="${c}" opacity=".85"/>` : "";
+    const crown = r.tier >= 6 ? `<path d="M13 4 L16 8 L20 3 L24 8 L27 4 L26 10 H14 Z" fill="#ffd36b"/>` : "";
+    return `<svg class="rbadge" width="${s}" height="${s}" viewBox="0 0 40 40" aria-hidden="true">${wings}<path d="M20 6 L34 12 V22 C34 30 28 35 20 38 C12 35 6 30 6 22 V12 Z" fill="${c}" stroke="rgba(255,255,255,.6)" stroke-width="1.5"/><path d="M20 10 L30 14.5 V22 C30 28 26 31.5 20 34 C14 31.5 10 28 10 22 V14.5 Z" fill="rgba(0,0,0,.3)"/>${crown}<text x="20" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" font-family="Barlow Condensed, Inter, sans-serif">${r.div}</text></svg>`;
+  };
 
   // ---- サンプル(共有データが空のときだけ表示。保存はしない)
   function makeSample() {
@@ -1192,8 +1210,19 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
           <input type="text" inputmode="numeric" id="amt-${i}" class="amt" placeholder="0" value="${esc(m.amt)}" maxlength="3" aria-label="${esc(m.name)}の変動%"><span class="label">%</span>
         </div>
         <div class="memrow delta quick">${[10, 15, 20, 25, 30].map(v => `<button type="button" data-amt="${v}" aria-pressed="${String(m.amt) === String(v)}">${v}%</button>`).join("")}</div>
+        <div class="memrow currank">${curRank(m, i)}</div>
       </div>`).join("") : `<div class="empty">まだ誰もいません。下で名前を追加してください(最大6人)。</div>`;
     renderKnown();
+  }
+  // 記録フォームで、そのメンバーのいまのランクを見せる。未設定ならその場で設定できる
+  function curRank(m, i) {
+    // ロールごとのランクを3つ並べ、選んだロールを強調。選んだロールが未設定ならその場で設定
+    const p = players[m.name], ranks = (p && p.ranks) || {};
+    const all = `<span class="rk3">${ROLES.map(([k, ja]) => { const r = ranks[k];
+      return `<span class="rk ${m.role === k ? "on" : ""}"><span class="rolebadge ${k}">${ja}</span>${validRank(r) ? `${rankBadge(r, 24)}<b>${rankLabel(r)}</b>` : `<small>未設定</small>`}</span>`; }).join("")}</span>`;
+    const r = m.role && ranks[m.role];
+    if (!m.role || validRank(r) || !canWrite || !pcol) return all;
+    return all + `<span class="label">${ROLE_JA[m.role]}のランク</span><select class="qt" aria-label="ティア">${TIERS.map(([n], k) => `<option value="${k}" ${k === 2 ? "selected" : ""}>${n}</option>`).join("")}</select><select class="qd" aria-label="ディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><button type="button" class="ghost primaryish" data-qsave="${i}">決定</button>`;
   }
   function renderKnown() {
     // 候補はサンプルではなく本物の記録から出す
@@ -1204,7 +1233,16 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const ks = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).filter(n => !inForm.has(n)).slice(0, 12);
     $("known").innerHTML = ks.map(n => `<button type="button" class="nt" data-k="${esc(n)}">+ ${esc(n)}</button>`).join("");
   }
-  $("members").addEventListener("click", e => {
+  $("members").addEventListener("click", async e => {
+    const qs = e.target.closest("[data-qsave]");
+    if (qs) {
+      const m = form.members[+qs.dataset.qsave], box = qs.closest(".mem"); if (!m || !m.role || !pcol) return;
+      const p = players[m.name] || { ranks: {}, platform: "" };
+      const ranks = { ...p.ranks, [m.role]: { tier: +box.querySelector(".qt").value, div: +box.querySelector(".qd").value, pct: 0 } };
+      try { await pcol.doc(pid(m.name)).set({ name: m.name, ranks, platform: p.platform || "", updatedAt: Date.now() }); players[m.name] = { name: m.name, ranks, platform: p.platform || "" }; renderMembers(); }
+      catch (err) { $("toast").textContent = "ランクを保存できませんでした"; }
+      return;
+    }
     const rm = e.target.closest("[data-rm]");
     if (rm) { form.members.splice(+rm.dataset.rm, 1); renderMembers(); return; }
     const row = e.target.closest(".mem"); if (!row) return; const m = form.members[+row.dataset.i];
@@ -1255,7 +1293,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("enemyPick").addEventListener("click", () => openPicker({ kind: "enemy" }));
   renderEnemyChips();
   // 味方(フレンド以外の野良)は 5人 - 登録メンバー数 まで
-  function allyMax() { return Math.max(0, 5 - form.members.length); }
+  // 6v6 にも対応できるよう、自分たち+味方で最大6人
+  function allyMax() { return Math.max(0, 6 - form.members.length); }
   function renderAllyChips() {
     if (form.allies.length > allyMax()) form.allies.length = allyMax();
     $("allies").innerHTML = form.allies.length ? form.allies.map((h, i) => `<span class="echip">${heroEmblem(h, HERO_ROLE[h])}${esc(h)}<button type="button" data-ai="${i}" aria-label="${esc(h)}を外す">×</button></span>`).join("") : `<span class="empty">まだ選ばれていません(最大${allyMax()}体)</span>`;
@@ -1624,11 +1663,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       const heroCount = new Map(); es.forEach(({ x }) => { if (x.hero) heroCount.set(x.hero, (heroCount.get(x.hero) || 0) + 1); });
       const tops = [...heroCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
       if (editing === name) return memberEditor(name, p);
-      const roleRows = ROLES.filter(([k]) => validRank(p.ranks && p.ranks[k]) || chg[k]).map(([k, ja]) => {
+      const roleRows = ROLES.map(([k, ja]) => {
         const r = p.ranks && p.ranks[k];
         const c = chg[k];
         return `<span class="rolebadge ${k}">${ja}</span>
-          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}"><i></i><span>${rankLabel(r)}</span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
+          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}</span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
           <span class="chg ${c > 0 ? "up" : c < 0 ? "down" : ""}">${c ? sgn(c) : ""}</span>`;
       }).join("");
       return `<div class="mcard">
@@ -2243,6 +2282,9 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["近日", "Soon", "곧 지원"],
     ["オーバーウォッチ 2", "Overwatch 2", "오버워치 2"],
     ["マーベル・ライバルズ", "Marvel Rivals", "마블 라이벌즈"],
+    ["招待リンクをコピー", "Copy invite link", "초대 링크 복사"],
+    ["コピーしました ✓", "Copied ✓", "복사했습니다 ✓"],
+    ["LINEやDiscordに貼り付けて送ってください。開くだけでスクワッドに入れます。", "Paste it in LINE or Discord. Opening it joins the squad.", "LINE이나 Discord에 붙여넣어 보내세요. 열기만 하면 스쿼드에 들어갑니다."],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
@@ -2514,6 +2556,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       const next = {};
       snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.name === "string") next[v.name] = { name: v.name, ranks: v.ranks || {}, platform: v.platform || "" }; });
       players = next;
+      renderMembers();
       if (!isSample) render();
     }, fail));
     unsubs.push(dcol.onSnapshot(snap => {
@@ -2605,8 +2648,16 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   });
   $("gInvite").addEventListener("click", async () => {
     const url = location.origin + location.pathname + "#" + group.id;
-    try { await navigator.clipboard.writeText(url); $("gHint").textContent = "招待リンクをコピーしました。仲間に送れば、開くだけでスクワッドに入れます: " + url; }
-    catch (e) { $("gHint").textContent = "このリンクを仲間に送ってください: " + url; }
+    // 長いURLは見せず、押すだけでコピー。コピーできない環境では共有メニュー、それもだめならURLを出す
+    const btn = $("gInvite");
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = "コピーしました ✓"; setTimeout(() => { btn.textContent = "招待リンクをコピー"; }, 2000);
+      $("gHint").textContent = "LINEやDiscordに貼り付けて送ってください。開くだけでスクワッドに入れます。";
+    } catch (e) {
+      if (navigator.share) { try { await navigator.share({ title: document.title, url }); return; } catch (e2) { if (e2 && e2.name === "AbortError") return; } }
+      $("gHint").textContent = "このリンクを仲間に送ってください: " + url;
+    }
   });
   async function startAuth() {
     try {
