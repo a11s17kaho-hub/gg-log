@@ -1080,7 +1080,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const QUEUES = ["クイック", "ランク", "スタジアム", "アーケード", "カスタム"];
   const ROLES = [["tank", "タンク"], ["damage", "ダメージ"], ["support", "サポート"]];
   const ROLE_JA = Object.fromEntries(ROLES);
-  const TIERS = [["ブロンズ", "#a2693c"], ["シルバー", "#9aa4b1"], ["ゴールド", "#d4a420"], ["プラチナ", "#4fa3a5"], ["ダイヤモンド", "#5a8ee6"], ["マスター", "#3fb27f"], ["グランドマスター", "#9b6be0"], ["チャンピオン", "#e0655a"]];
+  const TIERS = [["ブロンズ", "#a2693c"], ["シルバー", "#9aa4b1"], ["ゴールド", "#d4a420"], ["プラチナ", "#4fa3a5"], ["ダイヤモンド", "#5a8ee6"], ["マスター", "#8fb4c9"], ["グランドマスター", "#9b6be0"], ["チャンピオン", "#e0655a"], ["エメラルド", "#19c37d"]];
+  // 並び順(エメラルドは後から追加したので、保存済みの番号を変えないよう末尾に置き、表示順だけプラチナの次にする)
+  const TIER_ORDER = [0, 1, 2, 3, 8, 4, 5, 6, 7];
+  const tpos = t => TIER_ORDER.indexOf(t);
   const PLATFORMS = [["pc", "PC"], ["ps", "PlayStation"], ["xbox", "Xbox"], ["switch", "Switch"]];
   const PLAT_LABEL = Object.fromEntries(PLATFORMS);
   const RES_LABEL = { win: "WIN", loss: "LOSE", draw: "DRAW" };
@@ -1103,15 +1106,15 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 
   // ランク: ティア×5ディビジョン×100% を1本の数値にして上下させる
   const MAX_TOTAL = TIERS.length * 500 - 1;
-  const rankTotal = r => (r.tier * 5 + (5 - r.div)) * 100 + (r.pct || 0);
-  const fromTotal = t => { t = Math.max(0, Math.min(MAX_TOTAL, Math.round(t))); const tier = Math.floor(t / 500), rem = t % 500; return { tier, div: 5 - Math.floor(rem / 100), pct: rem % 100 }; };
+  const rankTotal = r => (tpos(r.tier) * 5 + (5 - r.div)) * 100 + (r.pct || 0);
+  const fromTotal = t => { t = Math.max(0, Math.min(MAX_TOTAL, Math.round(t))); const tier = TIER_ORDER[Math.floor(t / 500)], rem = t % 500; return { tier, div: 5 - Math.floor(rem / 100), pct: rem % 100 }; };
   const validRank = r => r && Number.isInteger(r.tier) && r.tier >= 0 && r.tier < TIERS.length && r.div >= 1 && r.div <= 5;
   const rankLabel = r => `${TIERS[r.tier][0]} ${r.div}`;
   // ランクのバッジ(コードで描く盾形。ティアの色、マスター以上は翼、真ん中にディビジョン1〜5)
   const rankBadge = (r, s = 30) => {
-    const c = TIERS[r.tier][1], hi = r.tier >= 5;
+    const c = TIERS[r.tier][1], hi = tpos(r.tier) >= 6;
     const wings = hi ? `<path d="M5 14 L0 10 L1 20 L5 24 Z M35 14 L40 10 L39 20 L35 24 Z" fill="${c}" opacity=".85"/>` : "";
-    const crown = r.tier >= 6 ? `<path d="M13 4 L16 8 L20 3 L24 8 L27 4 L26 10 H14 Z" fill="#ffd36b"/>` : "";
+    const crown = tpos(r.tier) >= 7 ? `<path d="M13 4 L16 8 L20 3 L24 8 L27 4 L26 10 H14 Z" fill="#ffd36b"/>` : "";
     return `<svg class="rbadge" width="${s}" height="${s}" viewBox="0 0 40 40" aria-hidden="true">${wings}<path d="M20 6 L34 12 V22 C34 30 28 35 20 38 C12 35 6 30 6 22 V12 Z" fill="${c}" stroke="rgba(255,255,255,.6)" stroke-width="1.5"/><path d="M20 10 L30 14.5 V22 C30 28 26 31.5 20 34 C14 31.5 10 28 10 22 V14.5 Z" fill="rgba(0,0,0,.3)"/>${crown}<text x="20" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" font-family="Barlow Condensed, Inter, sans-serif">${r.div}</text></svg>`;
   };
 
@@ -1155,7 +1158,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   let db = null, col = null, pcol = null, canWrite = true;
   let auth = null, authUser = null, me = null, nameEditing = false;
   let matches = [], players = {};
-  let isSample = true, shown = 15, editing = null, pendingDel = null;
+  let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null;
   const form = { result: null, queue: "ランク", members: [], enemies: [], allies: [] };
 
   // ---- フォーム
@@ -1222,7 +1225,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       return `<span class="rk ${m.role === k ? "on" : ""}"><span class="rolebadge ${k}">${ja}</span>${validRank(r) ? `${rankBadge(r, 24)}<b>${rankLabel(r)}</b>` : `<small>未設定</small>`}</span>`; }).join("")}</span>`;
     const r = m.role && ranks[m.role];
     if (!m.role || validRank(r) || !canWrite || !pcol) return all;
-    return all + `<span class="label">${ROLE_JA[m.role]}のランク</span><select class="qt" aria-label="ティア">${TIERS.map(([n], k) => `<option value="${k}" ${k === 2 ? "selected" : ""}>${n}</option>`).join("")}</select><select class="qd" aria-label="ディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><button type="button" class="ghost primaryish" data-qsave="${i}">決定</button>`;
+    return all + `<span class="label">${ROLE_JA[m.role]}のランク</span><select class="qt" aria-label="ティア">${TIER_ORDER.map(k => `<option value="${k}" ${k === 2 ? "selected" : ""}>${TIERS[k][0]}</option>`).join("")}</select><select class="qd" aria-label="ディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><button type="button" class="ghost primaryish" data-qsave="${i}">決定</button>`;
   }
   function renderKnown() {
     // 候補はサンプルではなく本物の記録から出す
@@ -1654,7 +1657,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const sel = $("fMember").value;
     const names = knownNames().filter(n => !sel || n === sel);
     const P = curPlayers();
-    $("tiersKey").innerHTML = TIERS.map(([n, c]) => `<span style="--c:${c}"><i></i>${n}</span>`).join("");
+    $("tiersKey").innerHTML = TIER_ORDER.map(k => TIERS[k]).map(([n, c]) => `<span style="--c:${c}"><i></i>${n}</span>`).join("");
     if (!names.length) { $("mcards").innerHTML = `<div class="empty">試合を記録すると、ここにメンバーごとの勝率・現在ランク・よく使うヒーローが並びます。</div>`; return; }
     $("mcards").innerHTML = names.map(name => {
       const es = entriesOf(list, name), t = tally(es.map(e => e.m));
@@ -1675,7 +1678,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         ${wlBar(t)}
         ${roleRows ? `<div class="ranks">${roleRows}</div>` : `<div class="label">現在ランクが未設定です</div>`}
         ${tops.length ? `<div class="heroes">${tops.map(([h, n]) => `<span class="htag">${esc(h)} ×${n}</span>`).join("")}</div>` : ""}
-        ${isSample || !canWrite ? "" : `<div class="acts"><button class="ghost" data-edit="${esc(name)}">ランクを設定</button></div>`}
+        ${isSample || !canWrite ? "" : `<div class="acts"><button class="ghost" data-edit="${esc(name)}">ランクを設定</button><button class="ghost del${pendingPDel === name ? " confirm" : ""}" data-pdel="${esc(name)}">${pendingPDel === name ? "本当に消す" : "メンバーを消す"}</button></div>`}
       </div>`;
     }).join("");
   }
@@ -1684,7 +1687,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       <div class="editor" data-name="${esc(name)}">
         ${ROLES.map(([k, ja]) => { const r = (p.ranks || {})[k]; const v = validRank(r);
           return `<div class="er" data-role="${k}"><span class="rolebadge ${k}">${ja}</span>
-            <select class="et" aria-label="${ja}のティア"><option value="">未設定</option>${TIERS.map(([n], i) => `<option value="${i}" ${v && r.tier === i ? "selected" : ""}>${n}</option>`).join("")}</select>
+            <select class="et" aria-label="${ja}のティア"><option value="">未設定</option>${TIER_ORDER.map(i => `<option value="${i}" ${v && r.tier === i ? "selected" : ""}>${TIERS[i][0]}</option>`).join("")}</select>
             <select class="ed" aria-label="${ja}のディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}" ${v && r.div === d ? "selected" : ""}>${d}</option>`).join("")}</select>
             <input type="text" inputmode="numeric" class="ep" maxlength="2" placeholder="%" value="${v ? (r.pct || 0) : ""}" aria-label="${ja}の進行度%">
           </div>`; }).join("")}
@@ -1694,6 +1697,21 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       </div></div>`;
   }
   $("mcards").addEventListener("click", async e => {
+    // 間違えて足したメンバーを消す(2回押しで確定)。ランクの記録を消し、試合に出ていなければ一覧からも消える
+    const pd = e.target.closest("[data-pdel]");
+    if (pd) {
+      const name = pd.dataset.pdel;
+      if (pendingPDel !== name) { pendingPDel = name; render(); return; }
+      pendingPDel = null;
+      const played = matches.some(m => (m.members || []).some(x => x && x.name === name));
+      try {
+        await pcol.doc(pid(name)).delete();
+        delete players[name];
+        form.members = form.members.filter(m => m.name !== name); renderMembers();
+        $("toast").textContent = played ? `${name}のランクを消しました。試合の記録に名前が残っているので、消すには履歴からその試合を消してください` : `${name}を消しました`;
+      } catch (err) { $("toast").textContent = "消せませんでした"; }
+      render(); return;
+    }
     const ed = e.target.closest("[data-edit]");
     if (ed) { editing = ed.dataset.edit; render(); return; }
     if (e.target.closest("[data-cancel]")) { editing = null; render(); return; }
@@ -2285,6 +2303,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["招待リンクをコピー", "Copy invite link", "초대 링크 복사"],
     ["コピーしました ✓", "Copied ✓", "복사했습니다 ✓"],
     ["LINEやDiscordに貼り付けて送ってください。開くだけでスクワッドに入れます。", "Paste it in LINE or Discord. Opening it joins the squad.", "LINE이나 Discord에 붙여넣어 보내세요. 열기만 하면 스쿼드에 들어갑니다."],
+    ["メンバーを消す", "Remove member", "멤버 삭제"],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
@@ -2398,7 +2417,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["クイック", "Quick Play", "빠른 대전"], ["ランク", "Competitive", "경쟁전"], ["スタジアム", "Stadium", "스타디움"], ["アーケード", "Arcade", "아케이드"], ["カスタム", "Custom", "사용자 지정"],
     ["コントロール", "Control", "쟁탈"], ["エスコート", "Escort", "호위"], ["ハイブリッド", "Hybrid", "혼합"], ["プッシュ", "Push", "밀기"], ["フラッシュポイント", "Flashpoint", "플래시포인트"], ["クラッシュ", "Clash", "격돌"], ["その他", "Other", "기타"],
     ["タンク", "Tank", "돌격"], ["ダメージ", "Damage", "공격"], ["サポート", "Support", "지원"],
-    ["ブロンズ", "Bronze", "브론즈"], ["シルバー", "Silver", "실버"], ["ゴールド", "Gold", "골드"], ["プラチナ", "Platinum", "플래티넘"], ["ダイヤモンド", "Diamond", "다이아몬드"], ["グランドマスター", "Grandmaster", "그랜드마스터"], ["マスター", "Master", "마스터"], ["チャンピオン", "Champion", "챔피언"],
+    ["エメラルド", "Emerald", "에메랄드"], ["ブロンズ", "Bronze", "브론즈"], ["シルバー", "Silver", "실버"], ["ゴールド", "Gold", "골드"], ["プラチナ", "Platinum", "플래티넘"], ["ダイヤモンド", "Diamond", "다이아몬드"], ["グランドマスター", "Grandmaster", "그랜드마스터"], ["マスター", "Master", "마스터"], ["チャンピオン", "Champion", "챔피언"],
     ["▲上がった", "▲ Up", "▲ 상승"], ["▼下がった", "▼ Down", "▼ 하락"],
     ["プレイヤーA", "Player A", "플레이어 A"], ["プレイヤーB", "Player B", "플레이어 B"], ["プレイヤーC", "Player C", "플레이어 C"], ["プレイヤーD", "Player D", "플레이어 D"],
     // ヒーロー
