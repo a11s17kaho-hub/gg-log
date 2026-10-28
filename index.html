@@ -480,6 +480,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .mchip b { font-size: 12px; }
 .hteams { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .hk { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.hrank { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.pgn { margin-left: 4px; color: var(--muted); font-size: 11px; }
 .zone { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--surface-2); }
 .zlabel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-weight: 700; font-size: 14px; color: var(--accent); }
 .zlabel small { font-weight: 400; font-size: 12px; color: var(--muted); }
@@ -792,6 +794,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 
       <section class="panel" aria-labelledby="h-list">
         <h2 id="h-list">試合の記録</h2>
+        <p class="hint">▲▼の%は、試合のあとにゲームに出る「ランクの進み具合」の増減です。100%たまるとディビジョンが1つ上がり(例: ゴールド3→ゴールド2)、0%を下回ると1つ下がります。名前の横のバッジは、その試合が終わった時点のランクと進み具合です。</p>
         <div class="hist" id="rows"></div>
         <button class="ghost more" id="more" hidden>もっと見る</button>
       </section>
@@ -1689,7 +1692,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         const r = p.ranks && p.ranks[k];
         const c = chg[k];
         return `<span class="rolebadge ${k}">${ja}</span>
-          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}</span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
+          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}<small class="pgn">${r.pct || 0}%</small></span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
           <span class="chg ${c > 0 ? "up" : c < 0 ? "down" : ""}">${c ? sgn(c) : ""}</span>`;
       }).join("");
       return `<div class="mcard">
@@ -1888,8 +1891,23 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     $("byMap").innerHTML = html || `<div class="empty">試合を記録すると、モードごとの見出しの下にマップ別の勝ち負けが並びます。</div>`;
   }
 
+  // 今のランクから新しい試合の変動を順に引いて、各試合が終わった時点のランクを出す
+  function rankAfterMap() {
+    const P = curPlayers(), out = {}, run = {};
+    const all = source().slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt || 0) - (a.createdAt || 0));
+    all.forEach(m => (m.members || []).forEach(x => {
+      if (!x || !x.role || !x.delta) return;
+      const key = x.name + "|" + x.role;
+      if (!(key in run)) { const r = P[x.name] && P[x.name].ranks && P[x.name].ranks[x.role]; run[key] = validRank(r) ? rankTotal(r) : null; }
+      if (run[key] == null) return;
+      out[m.id + "|" + x.name] = fromTotal(run[key]);
+      run[key] -= x.delta;
+    }));
+    return out;
+  }
   function renderRows(list) {
     const rows = list.slice().reverse();
+    const after = rankAfterMap();
     const mini = hs => hs.map(h => `<span title="${esc(h)}">${heroEmblem(h, HERO_ROLE[h])}</span>`).join("");
     $("rows").innerHTML = rows.length ? rows.slice(0, shown).map(m => `
       <article class="hrow ${esc(m.result)}">
@@ -1897,7 +1915,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         <span class="hart">${mapArt(m.map)}</span>
         <div class="hmain">
           <div class="htop"><b>${esc(m.map)}</b><span class="hmeta">${esc(m.date)} · ${esc(m.queue)}</span></div>
-          <div class="hmem"><span class="hk">フレンド</span>${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}%</b>` : ""}</span>`).join("")}</div>
+          <div class="hmem"><span class="hk">フレンド</span>${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}%</b>${after[m.id + "|" + x.name] ? `<span class="hrank">${rankBadge(after[m.id + "|" + x.name], 18)}${rankLabel(after[m.id + "|" + x.name])}・${after[m.id + "|" + x.name].pct}%</span>` : ""}` : ""}</span>`).join("")}</div>
           ${(m.allies || []).length || (m.enemies || []).length ? `<div class="hteams">${(m.allies || []).length ? `<span class="hk">野良の味方</span><span class="mini">${mini(m.allies)}</span>` : ""}${(m.enemies || []).length ? `<span class="hk">相手</span><span class="mini">${mini(m.enemies)}</span>` : ""}</div>` : ""}
           ${m.note ? `<div class="hnote">${esc(m.note)}</div>` : ""}
           ${m.by || m.editedBy ? `<div class="hby">${m.by ? `記録: <span class="nt">${esc(m.by)}</span>` : ""}${m.editedBy ? ` · 編集: <span class="nt">${esc(m.editedBy)}</span>` : ""}</div>` : ""}
@@ -2353,6 +2371,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["野良の味方", "Randoms", "랜덤 아군"],
     ["直して保存", "Save changes", "수정 저장"],
     ["編集", "Edit", "수정"],
+    ["▲▼の%は、試合のあとにゲームに出る「ランクの進み具合」の増減です。100%たまるとディビジョンが1つ上がり(例: ゴールド3→ゴールド2)、0%を下回ると1つ下がります。名前の横のバッジは、その試合が終わった時点のランクと進み具合です。", "▲▼% is the change in rank progress shown after each match. At 100% you move up a division (e.g. Gold 3 → Gold 2); below 0% you drop one. The badge shows the rank and progress right after that match.", "▲▼%는 경기 후 게임에 나오는 랭크 진행도의 변화입니다. 100%가 되면 디비전이 하나 오르고(예: 골드3→골드2), 0% 아래로 내려가면 하나 내려갑니다. 배지는 그 경기 직후의 랭크와 진행도입니다."],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
