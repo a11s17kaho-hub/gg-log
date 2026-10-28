@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://gglog.web.app/sitemap.xml

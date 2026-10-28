@@ -1,0 +1,28 @@
+rules_version = '2';
+// 見るのはだれでもOK。書き込み・削除は Google でログインした人だけ。1件の大きさを制限する
+// users/{uid} は本人だけが読み書きできる(記録に使う名前と、入ったグループ)
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function okCol(c) { return c in ['matches', 'players', 'duels']; }
+    function okDoc() { return request.resource.data.size() <= 20; }
+    function signedIn() { return request.auth != null; }
+    match /{c}/{id} {
+      allow read: if okCol(c);
+      allow delete: if okCol(c) && signedIn();
+      allow create, update: if okCol(c) && signedIn() && okDoc();
+    }
+    match /groups/{g}/{c}/{id} {
+      allow read: if okCol(c);
+      allow delete: if okCol(c) && signedIn();
+      allow create, update: if okCol(c) && signedIn() && okDoc();
+    }
+    // 全体ランキング用(全グループの試合をまとめて読む)
+    match /{path=**}/matches/{id} {
+      allow read: if true;
+    }
+    match /users/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.size() <= 5;
+    }
+  }
+}
