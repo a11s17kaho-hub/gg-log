@@ -911,6 +911,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["プッシュ", ["Colosseo", "Esperança", "New Queen Street", "Runasapi"]],
     ["フラッシュポイント", ["Aatlis", "New Junk City", "Suravasa"]],
     ["クラッシュ", ["Hanaoka", "Throne of Anubis"]],
+    ["スタジアム", ["Arena Victoriae", "Busan Sanctuary", "Gogadoro", "Ilios Ruins", "Lijiang Tower Night Market", "Nepal Shrine", "Oasis Gardens", "Oasis University", "Samoa Volcano", "Wuxing University", "Place Lacroix", "Redwood Dam", "Serenza", "Powder Keg Mine", "Thames District"]],
     ["その他", ["Other"]],
   ];
   const MAP_TYPE = {};
@@ -932,7 +933,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const DUEL_MAP_TYPE = {};
   DUEL_MAPS.forEach(([t, ms]) => ms.forEach(m => DUEL_MAP_TYPE[m] = t));
   // アリーナには専用の絵がないので、雰囲気の近いマップの絵を借りる
-  const MAP_ART_ALIAS = { "Lijiang Tower: Control Center": "Lijiang Tower", "Black Forest": "Eichenwalde", "Castillo": "Dorado", "Ecopoint: Antarctica": "Antarctic Peninsula", "Necropolis": "Throne of Anubis", "Château Guillard": "King's Row", "Kanezaka": "Hanaoka", "Malevento": "Rialto", "Petra": "Aatlis" };
+  const MAP_ART_ALIAS = { "Busan Sanctuary": "Busan", "Ilios Ruins": "Ilios", "Lijiang Tower Night Market": "Lijiang Tower", "Nepal Shrine": "Nepal", "Oasis Gardens": "Oasis", "Oasis University": "Oasis", "Samoa Volcano": "Samoa", "Lijiang Tower: Control Center": "Lijiang Tower", "Black Forest": "Eichenwalde", "Castillo": "Dorado", "Ecopoint: Antarctica": "Antarctic Peninsula", "Necropolis": "Throne of Anubis", "Château Guillard": "King's Row", "Kanezaka": "Hanaoka", "Malevento": "Rialto", "Petra": "Aatlis" };
   const MODE_ICON = {
     "コントロール": '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>',
     "エスコート": '<rect x="3" y="8" width="13" height="8" rx="1.5"/><path d="M16 11h3l2 3v2h-5"/><circle cx="7" cy="18" r="1.6" fill="currentColor"/><circle cx="17" cy="18" r="1.6" fill="currentColor"/>',
@@ -1304,8 +1305,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("enemyPick").addEventListener("click", () => openPicker({ kind: "enemy" }));
   renderEnemyChips();
   // 味方(フレンド以外の野良)は 5人 - 登録メンバー数 まで
-  // 6v6 にも対応できるよう、自分たち+味方で最大6人
-  function allyMax() { return Math.max(0, 6 - form.members.length); }
+  // フレンド以外の味方は最大6人まで選べる
+  function allyMax() { return 6; }
   function renderAllyChips() {
     if (form.allies.length > allyMax()) form.allies.length = allyMax();
     $("allies").innerHTML = form.allies.length ? form.allies.map((h, i) => `<span class="echip">${heroEmblem(h, HERO_ROLE[h])}${esc(h)}<button type="button" data-ai="${i}" aria-label="${esc(h)}を外す">×</button></span>`).join("") : `<span class="empty">まだ選ばれていません(最大${allyMax()}体)</span>`;
