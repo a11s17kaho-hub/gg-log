@@ -522,10 +522,16 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .acctbar.welcome { flex-direction: column; align-items: stretch; gap: 14px; border-left: 0; border-top: 4px solid var(--accent); padding-block: 22px; background: linear-gradient(160deg, var(--surface-2), var(--surface) 60%); }
 .acctbar.welcome .anow b { font-family: var(--font-display); font-size: 26px; letter-spacing: .02em; line-height: 1.2; }
 .acctbar.welcome .aform { justify-content: flex-start; }
+.rsetup { display: grid; gap: 8px; width: 100%; }
+.rsrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rsrow .rolebadge { min-width: 5.5em; text-align: center; }
+.rsrow select { width: auto; min-width: 7em; }
+.rsrow .rsd { min-width: 4em; }
+.rsrow .rsp { width: 5em; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .acctbar.welcome .gbtn { font-size: 16px; padding: 12px 24px 12px 16px; background: #fff; color: #1f1f1f; border-color: #fff; }
 .acctbar.welcome .gbtn svg { width: 24px; height: 24px; }
 .acctbar.welcome .aform input { width: 16em; font-size: 16px; }
-.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; counter-reset: st; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; counter-reset: st; }
 .steps li { counter-increment: st; display: flex; gap: 8px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--muted); font-size: 13px; line-height: 1.4; min-width: 0; }
 .steps li::before { content: counter(st); flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; background: var(--chip); color: var(--muted); }
 .steps li b { display: block; color: var(--fg); font-size: 14px; }
@@ -1169,7 +1175,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   // ---- 状態
   let db = null, col = null, pcol = null, canWrite = true;
   let auth = null, authUser = null, me = null, nameEditing = false;
-  let matches = [], players = {};
+  let matches = [], players = {}, playersReady = false;
   let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null, editingMatch = null;
   const form = { result: null, queue: "ランク", members: [], enemies: [], allies: [] };
 
@@ -1308,6 +1314,19 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("enemyPick").addEventListener("click", () => openPicker({ kind: "enemy" }));
   renderEnemyChips();
   // 味方(フレンド以外の野良)は 5人 - 登録メンバー数 まで
+  // ロールごとの枠(6v6 に合わせて各2体)。枠がいっぱいのロールを選ぶと、そのロールで最後に選んだヒーローと入れ替える
+  const ROLE_CAP = { tank: 2, damage: 2, support: 2 };
+  function pickWithCap(list, h, fixedRoles, max) {
+    const j = list.indexOf(h);
+    if (j >= 0) { list.splice(j, 1); return; }
+    const r = HERO_ROLE[h];
+    const used = fixedRoles.filter(x => x === r).length + list.filter(x => HERO_ROLE[x] === r).length;
+    if (r && used >= ROLE_CAP[r]) {
+      for (let k = list.length - 1; k >= 0; k--) if (HERO_ROLE[list[k]] === r) { list.splice(k, 1, h); return; }
+      return;
+    }
+    if (list.length < max) list.push(h);
+  }
   // フレンド以外の味方は最大6人まで選べる
   function allyMax() { return 6; }
   function renderAllyChips() {
@@ -1358,12 +1377,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       closePicker(); renderDForm(); return;
     }
     if (pk.kind === "enemy") {
-      const j = form.enemies.indexOf(h);
-      if (j >= 0) form.enemies.splice(j, 1); else if (form.enemies.length < 6) form.enemies.push(h);
+      pickWithCap(form.enemies, h, [], 6);
       renderEnemyChips(); renderPicker();
     } else if (pk.kind === "ally") {
-      const j = form.allies.indexOf(h);
-      if (j >= 0) form.allies.splice(j, 1); else if (form.allies.length < allyMax()) form.allies.push(h);
+      // 味方の枠は、フレンドが使っているロールも数に入れる
+      pickWithCap(form.allies, h, form.members.map(m => m.role || HERO_ROLE[m.hero]).filter(Boolean), allyMax());
       renderAllyChips(); renderPicker();
     } else {
       const m = form.members[pk.i];
@@ -2372,6 +2390,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["直して保存", "Save changes", "수정 저장"],
     ["編集", "Edit", "수정"],
     ["▲▼の%は、試合のあとにゲームに出る「ランクの進み具合」の増減です。100%たまるとディビジョンが1つ上がり(例: ゴールド3→ゴールド2)、0%を下回ると1つ下がります。名前の横のバッジは、その試合が終わった時点のランクと進み具合です。", "▲▼% is the change in rank progress shown after each match. At 100% you move up a division (e.g. Gold 3 → Gold 2); below 0% you drop one. The badge shows the rank and progress right after that match.", "▲▼%는 경기 후 게임에 나오는 랭크 진행도의 변화입니다. 100%가 되면 디비전이 하나 오르고(예: 골드3→골드2), 0% 아래로 내려가면 하나 내려갑니다. 배지는 그 경기 직후의 랭크와 진행도입니다."],
+    ["いまのランクを入れてください", "Enter your current ranks", "지금 랭크를 입력하세요"],
+    ["ここが記録のスタート地点になります。試合を記録するたびに、ここからランクの上がり下がりを追いかけます。やっていないロールは「未設定」のままでOKです。", "This is your starting point. Every match you log tracks your rank up and down from here. Leave roles you don't play as \"Not set\".", "여기가 기록의 시작점입니다. 경기를 기록할 때마다 여기서부터 랭크 변화를 추적합니다. 하지 않는 역할은 「미설정」 그대로 두세요."],
+    ["ランクを入れる", "Set your ranks", "랭크 입력"],
+    ["いまのロール別ランク", "Current rank per role", "역할별 현재 랭크"],
+    ["あと1つ", "ONE MORE", "하나 더"],
+    ["ランクを保存しました", "Ranks saved", "랭크를 저장했습니다"],
+    ["あとで", "Later", "나중에"],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
@@ -2626,7 +2651,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   }
   function connect() {
     unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = [];
-    matches = []; players = {}; isSample = true; editing = null; pendingDel = null;
+    matches = []; players = {}; playersReady = false; isSample = true; editing = null; pendingDel = null;
     duels = []; dIsSample = true; dPendingDel = null;
     showGroup(); render();
     if (!db) return;
@@ -2642,8 +2667,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     unsubs.push(pcol.onSnapshot(snap => {
       const next = {};
       snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.name === "string") next[v.name] = { name: v.name, ranks: v.ranks || {}, platform: v.platform || "" }; });
-      players = next;
-      renderMembers();
+      players = next; playersReady = true;
+      renderMembers(); renderAcct();
       if (!isSample) render();
     }, fail));
     unsubs.push(dcol.onSnapshot(snap => {
@@ -2674,6 +2699,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     if (!form.members.some(m => m.name === n)) { form.members.unshift({ name: n, hero: "", role: "", dir: 1, amt: "" }); form.members = form.members.slice(0, 6); renderMembers(); }
     if (!dform.p[0].name && dform.p[1].name !== n) { dform.p[0].name = n; $("d0Name").value = n; renderDForm(); }
   }
+  // 名前を決めたあと、自分のランクがまだ1つもなければ最初に入れてもらう(ランク推移の起点にする)
+  const rankSkipKey = () => "ow-rank-skip-" + myName();
+  function needRankSetup() {
+    if (!authUser || !me || !me.name || nameEditing || !pcol || !playersReady || lsGet(rankSkipKey())) return false;
+    const p = players[me.name];
+    return !(p && ROLES.some(([k]) => validRank(p.ranks[k])));
+  }
   function renderAcct() {
     const box = $("acct"); if (!auth) { box.hidden = true; return; }
     box.hidden = false;
@@ -2682,12 +2714,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     $("myGroups").hidden = !mg.length && !(me && group.id);
     $("myGroups").innerHTML = (mg.length ? `<span class="label">MY SQUADS</span>` + mg.map(g => `<button type="button" class="gchip nt" data-g="${esc(g)}">${esc(g)}</button>`).join("") : "")
       + (me && group.id ? `<button type="button" class="gchip out" data-gforget="${esc(group.name)}">一覧から外す</button>` : "");
-    const setup = !authUser || !me || !me.name;
+    const rankStep = needRankSetup();
+    const setup = !authUser || !me || !me.name || rankStep;
     box.classList.toggle("welcome", setup);
     $("aSteps").hidden = !setup;
     if (setup) {
-      const at = !authUser ? 0 : 1;
-      $("aSteps").innerHTML = [["Googleでログイン", "ボタンを押すだけ"], ["名前を決める", "記録に出る名前"], ["スクワッドに入る", "招待リンクかコード"], ["試合を記録", "結果を押して記録する"]]
+      const at = !authUser ? 0 : !me || !me.name ? 1 : 2;
+      $("aSteps").innerHTML = [["Googleでログイン", "ボタンを押すだけ"], ["名前を決める", "記録に出る名前"], ["ランクを入れる", "いまのロール別ランク"], ["スクワッドに入る", "招待リンクかコード"], ["試合を記録", "結果を押して記録する"]]
         .map(([t, d], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}"><span><b>${t}</b>${d}</span></li>`).join("");
     }
     $("aInapp").hidden = !(setup && !authUser && IN_APP);
@@ -2699,6 +2732,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     if (!me || !me.name || nameEditing) {
       $("aNow").innerHTML = `<span class="label">${me && me.name ? "PLAYER" : "あと少し"}</span><b>記録に使う名前を決めてください</b><span class="hint">ランキングや試合の記録に出る名前です。前から使っていた名前があれば、同じ名前にすると今までの記録とつながります。</span>`;
       $("aForm").innerHTML = `<input type="text" id="aName" class="nt" maxlength="24" list="nameList" placeholder="名前" aria-label="記録に使う名前" value="${esc(myName() || (authUser.displayName || "").slice(0, 24))}"><button type="button" class="ghost primaryish" id="aSave">決定</button>${me && me.name ? `<button type="button" class="ghost" id="aCancel">やめる</button>` : ""}`;
+      return;
+    }
+    if (rankStep) {
+      $("aNow").innerHTML = `<span class="label">あと1つ</span><b>いまのランクを入れてください</b><span class="hint">ここが記録のスタート地点になります。試合を記録するたびに、ここからランクの上がり下がりを追いかけます。やっていないロールは「未設定」のままでOKです。</span>`;
+      $("aForm").innerHTML = `<div class="rsetup">${ROLES.map(([k, ja]) => `<div class="rsrow" data-role="${k}"><span class="rolebadge ${k}">${ja}</span><select class="rst" aria-label="${ja}のティア"><option value="">未設定</option>${TIER_ORDER.map(t => `<option value="${t}">${TIERS[t][0]}</option>`).join("")}</select><select class="rsd" aria-label="${ja}のディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><input type="number" class="rsp" min="0" max="99" placeholder="%" aria-label="${ja}の進み具合(%)"></div>`).join("")}</div><button type="button" class="ghost primaryish" id="aRSave">保存</button><button type="button" class="ghost" id="aRSkip">あとで</button>`;
       return;
     }
     $("aNow").innerHTML = `<span class="label">PLAYER</span><b><span class="nt">${esc(me.name)}</span></b><span class="hint">${esc(authUser.email || "")}</span>`;
@@ -2719,6 +2757,19 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     } else if (id === "aOut") { await auth.signOut(); }
     else if (id === "aRename") { nameEditing = true; renderAcct(); $("aName").focus(); }
     else if (id === "aCancel") { nameEditing = false; renderAcct(); }
+    else if (id === "aRSkip") { lsSet(rankSkipKey(), "1"); renderAcct(); }
+    else if (id === "aRSave") {
+      const ranks = {};
+      $("aForm").querySelectorAll(".rsrow").forEach(row => {
+        const tv = row.querySelector(".rst").value; if (tv === "") return;
+        ranks[row.dataset.role] = { tier: +tv, div: +row.querySelector(".rsd").value, pct: Math.max(0, Math.min(99, parseInt(row.querySelector(".rsp").value, 10) || 0)) };
+      });
+      if (!Object.keys(ranks).length) { $("aForm").querySelector(".rst").focus(); return; }
+      const p = players[me.name] || { ranks: {}, platform: "" };
+      const all = { ...p.ranks, ...ranks };
+      try { await pcol.doc(pid(me.name)).set({ name: me.name, ranks: all, platform: p.platform || "", updatedAt: Date.now() }); players[me.name] = { name: me.name, ranks: all, platform: p.platform || "" }; $("toast").textContent = "ランクを保存しました"; renderMembers(); renderAcct(); }
+      catch (err) { $("toast").textContent = "ランクを保存できませんでした"; }
+    }
     else if (id === "aSave") {
       const n = $("aName").value.trim().slice(0, 24); if (!n) { $("aName").focus(); return; }
       me = { name: n, groups: me ? me.groups : (group.name ? [group.name] : []) }; nameEditing = false;
