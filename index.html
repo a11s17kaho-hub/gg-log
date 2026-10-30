@@ -562,6 +562,16 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .col > section[aria-label="絞り込み"] { order: -2; }
 .col > section[aria-labelledby="h-fhero"] { order: -1; }
 .fhlist { display: flex; flex-direction: column; gap: 6px; }
+/* フレンド登録 */
+.flme { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.flme .code { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: .12em; }
+.fladd { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.fladd input[type="text"] { width: 10em; text-transform: uppercase; }
+.flmsg { font-size: 13px; color: var(--accent); width: 100%; }
+.flrow { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
+.flrow .dl { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.flrow .dl b { font-variant-numeric: tabular-nums; }
+.mcard.self { border-color: var(--accent); }
 .fhrow {
   font: inherit; color: var(--fg); text-align: left; cursor: pointer; display: grid; grid-template-columns: minmax(6em, 10em) minmax(0, 1fr); gap: 8px 12px; align-items: center;
   border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0;
@@ -740,6 +750,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         <h2 id="h-when">曜日・時間帯別の勝率</h2>
         <p class="hint">記録した時刻で分けています。試合が終わってすぐ記録すると正確になります。</p>
         <div class="two" id="when"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-fl" id="flPanel" hidden>
+        <h2 id="h-fl">フレンド登録</h2>
+        <p class="hint">フレンドコードを交換すると、いっしょに遊んでいないときも、その人のいまのランクと最近の上がり下がりが見られます。相手にも自分のコードを登録してもらうと、おたがいに見られます。</p>
+        <div class="flme" id="flMe"></div>
+        <div class="fladd"><input type="text" id="flCode" maxlength="6" placeholder="フレンドコード" aria-label="フレンドコード" autocomplete="off"><button type="button" class="ghost primaryish" id="flAdd">登録</button><span class="flmsg" id="flMsg"></span></div>
+        <div class="mcards" id="flList"></div>
       </section>
 
       <section class="panel" aria-labelledby="h-fhero">
@@ -2044,7 +2062,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 
   // ---- ページ分け: 縦に長くならないよう、見たいものだけ出す。狭い画面では「記録する」も1ページ
   const PAGES = {
-    team: { view: "teamView", tabs: "teamPages", def: "sum", map: { "h-sum": "sum", "h-today": "sum", "h-rankb": "sum", "h-trend": "trend", "h-rank": "trend", "h-when": "trend", "h-fhero": "friends", "h-mem": "friends", "h-syn": "friends", "h-hero": "heroes", "h-enemy": "heroes", "h-map": "maps", "h-list": "history" } },
+    team: { view: "teamView", tabs: "teamPages", def: "sum", map: { "h-sum": "sum", "h-today": "sum", "h-rankb": "sum", "h-trend": "trend", "h-rank": "trend", "h-when": "trend", "h-fl": "friends", "h-fhero": "friends", "h-mem": "friends", "h-syn": "friends", "h-hero": "heroes", "h-enemy": "heroes", "h-map": "maps", "h-list": "history" } },
     duel: { view: "duelView", tabs: "duelPages", def: "rank", map: { "h-dlb": "rank", "h-dvs": "rank", "h-driv": "rival", "h-dhero": "rival", "h-dlist": "history" } },
   };
   const narrowMq = window.matchMedia("(max-width: 900px)");
@@ -2414,6 +2432,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["見るだけならログインはいりません。記録を追加するには、上の「Googleでログイン」を押してください。", "No sign-in needed to view. To add records, press \"Sign in with Google\" above.", "보기만 할 때는 로그인이 필요 없습니다. 기록을 추가하려면 위의 \"Google로 로그인\"을 누르세요."],
     ["記録する", "Record", "기록하기"], ["まとめ", "Summary", "요약"], ["推移", "Trends", "추이"], ["フレンド", "Friends", "친구"], ["ヒーロー", "Heroes", "영웅"], ["マップ", "Maps", "맵"], ["履歴", "History", "기록"], ["ランキング", "Ranking", "랭킹"], ["ライバル", "Rivals", "라이벌"], ["ページ", "Pages", "페이지"],
     ["フレンドの使用ヒーロー", "Heroes friends played", "친구가 사용한 영웅"],
+    ["フレンド登録", "Friend list", "친구 등록"], ["フレンドコード", "Friend code", "친구 코드"], ["自分のコード", "Your code", "내 코드"],
+    ["フレンド登録リンクをコピー", "Copy friend link", "친구 등록 링크 복사"], ["フレンドから外す", "Remove friend", "친구 삭제"], ["本当に外す", "Really remove", "정말 삭제"],
+    ["フレンドコードを交換すると、いっしょに遊んでいないときも、その人のいまのランクと最近の上がり下がりが見られます。相手にも自分のコードを登録してもらうと、おたがいに見られます。", "Swap friend codes to see a friend's current rank and recent ups and downs, even when you didn't play together. Ask them to add your code too so you can both see each other.", "친구 코드를 교환하면 같이 플레이하지 않을 때도 친구의 현재 랭크와 최근 오르내림을 볼 수 있습니다. 상대도 내 코드를 등록하면 서로 볼 수 있습니다."],
+    ["まだフレンドがいません。友達のフレンドコードを上に入れて「登録」を押してください。", "No friends yet. Enter a friend's code above and press Add.", "아직 친구가 없습니다. 위에 친구 코드를 넣고 등록을 누르세요."],
+    ["ランクがまだ入っていません", "No rank yet", "아직 랭크가 없습니다"],
     ["記録した試合で、フレンドがどのヒーローを使ったかです。名前を押すと、その人のヒーロー別の勝率と最近の試合が出ます。", "Which heroes each friend played in recorded matches. Tap a name to see their win rate per hero and recent matches.", "기록한 경기에서 친구가 어떤 영웅을 썼는지 보여줍니다. 이름을 누르면 영웅별 승률과 최근 경기가 나옵니다."],
     ["試合を記録すると、フレンドごとの使用ヒーローがここに並びます。", "Record matches to see the heroes each friend used here.", "경기를 기록하면 친구별 사용 영웅이 여기에 표시됩니다."],
     ["のヒーロー別", "— by hero", "의 영웅별"], ["最近の試合", "Recent matches", "최근 경기"], ["ヒーローなし", "No hero", "영웅 없음"], ["ヒーロー未記録", "No heroes recorded", "영웅 기록 없음"], ["ヒーローが記録されていません", "No heroes recorded", "기록된 영웅이 없습니다"], ["最後", "last", "마지막"],
@@ -2666,9 +2689,9 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     }, fail));
     unsubs.push(pcol.onSnapshot(snap => {
       const next = {};
-      snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.name === "string") next[v.name] = { name: v.name, ranks: v.ranks || {}, platform: v.platform || "" }; });
+      snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.name === "string") next[v.name] = { name: v.name, ranks: v.ranks || {}, platform: v.platform || "", at: v.updatedAt || 0 }; });
       players = next; playersReady = true;
-      renderMembers(); renderAcct();
+      renderMembers(); renderAcct(); syncProfile();
       if (!isSample) render();
     }, fail));
     unsubs.push(dcol.onSnapshot(snap => {
@@ -2688,11 +2711,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   }
 
   // ---- アカウント(Webサイト版だけ。Google でログイン)
-  // users/{uid} = { name: 記録に使う名前, groups: [入ったグループの合言葉] }
+  // users/{uid} = { name: 記録に使う名前, groups: [入ったグループの合言葉], friends: [フレンドのuid] }
   const myName = () => me && me.name || "";
   async function saveMe() {
     if (!db || !authUser || !me) return;
-    try { await db.collection("users").doc(authUser.uid).set({ name: me.name.slice(0, 24), groups: me.groups.slice(0, 12), updatedAt: Date.now() }); } catch (e) {}
+    try { await db.collection("users").doc(authUser.uid).set({ name: me.name.slice(0, 24), groups: me.groups.slice(0, 12), friends: (me.friends || []).slice(0, 30), updatedAt: Date.now() }); } catch (e) {}
   }
   function useMyName() {
     const n = myName(); if (!n) return;
@@ -2767,13 +2790,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       if (!Object.keys(ranks).length) { $("aForm").querySelector(".rst").focus(); return; }
       const p = players[me.name] || { ranks: {}, platform: "" };
       const all = { ...p.ranks, ...ranks };
-      try { await pcol.doc(pid(me.name)).set({ name: me.name, ranks: all, platform: p.platform || "", updatedAt: Date.now() }); players[me.name] = { name: me.name, ranks: all, platform: p.platform || "" }; $("toast").textContent = "ランクを保存しました"; renderMembers(); renderAcct(); }
+      try { await pcol.doc(pid(me.name)).set({ name: me.name, ranks: all, platform: p.platform || "", updatedAt: Date.now() }); players[me.name] = { name: me.name, ranks: all, platform: p.platform || "", at: Date.now() }; $("toast").textContent = "ランクを保存しました"; renderMembers(); renderAcct(); syncProfile(); }
       catch (err) { $("toast").textContent = "ランクを保存できませんでした"; }
     }
     else if (id === "aSave") {
       const n = $("aName").value.trim().slice(0, 24); if (!n) { $("aName").focus(); return; }
-      me = { name: n, groups: me ? me.groups : (group.name ? [group.name] : []) }; nameEditing = false;
-      await saveMe(); canWrite = true; useMyName(); renderAcct(); setStatus(); updateSubmit(); updateDSubmit();
+      me = { name: n, groups: me ? me.groups : (group.name ? [group.name] : []), friends: me ? me.friends || [] : [] }; nameEditing = false;
+      await saveMe(); await loadMyProfile(); watchFriends();
+      if (pendingFriend) { const c = pendingFriend; pendingFriend = ""; addFriend(c); } canWrite = true; useMyName(); renderAcct(); setStatus(); updateSubmit(); updateDSubmit();
     } else if (id === "aMine") {
       $("fMember").value = me.name; lsSet("ow-fMember", me.name); $("fMember").dispatchEvent(new Event("change"));
       setMode("team"); setPage("team", "sum");
@@ -2797,6 +2821,128 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       $("gHint").textContent = "このリンクを仲間に送ってください: " + url;
     }
   });
+
+  // ---- フレンド登録(Webサイト版だけ)
+  // profiles/{uid} = { name, code: フレンドコード, ranks: いまのロール別ランク, hist: [{ t: 時刻, r: ロール, v: ランク値 }], updatedAt }
+  // スクワッドで自分のランクが動くたびにここへ写す。フレンドは自分と同じスクワッドにいなくても、これを読んでランクの上下を見る
+  let myProfile = null, friendProfiles = {}, friendUnsubs = [], flMsg = "", pendingFlDel = "";
+  let pendingFriend = (location.hash.match(/^#f_([A-Z0-9]{6})$/) || [])[1] || "";
+  if (pendingFriend) history.replaceState(null, "", location.pathname + location.search);
+  const CODE_CH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => CODE_CH[b % CODE_CH.length]).join("");
+  const HIST_MAX = 150;
+  async function loadMyProfile() {
+    myProfile = null;
+    if (db && authUser && me && me.name) {
+      try { const d = await db.collection("profiles").doc(authUser.uid).get(); if (d.exists) { const v = d.data(); myProfile = { name: v.name || me.name, code: v.code || newCode(), ranks: v.ranks || {}, hist: Array.isArray(v.hist) ? v.hist : [], updatedAt: v.updatedAt || 0 }; } } catch (e) {}
+      if (!myProfile) { myProfile = { name: me.name, code: newCode(), ranks: {}, hist: [], updatedAt: 0 }; await saveProfile(); }
+    }
+    syncProfile();
+  }
+  async function saveProfile() {
+    if (!db || !authUser || !myProfile) return;
+    myProfile.hist = myProfile.hist.slice(-HIST_MAX);
+    try { await db.collection("profiles").doc(authUser.uid).set({ name: myProfile.name.slice(0, 24), code: myProfile.code, ranks: myProfile.ranks, hist: myProfile.hist, updatedAt: myProfile.updatedAt || 0 }); } catch (e) {}
+  }
+  // いま見ているスクワッドの自分のランクが、プロフィールより新しければ写す(古いスクワッドのランクで上書きしない)
+  function syncProfile() {
+    if (myProfile && me && me.name) {
+      let changed = myProfile.name !== me.name;
+      myProfile.name = me.name;
+      const p = players[me.name];
+      if (p && (p.at || 0) > (myProfile.updatedAt || 0)) {
+        ROLES.forEach(([k]) => {
+          const r = p.ranks && p.ranks[k], o = myProfile.ranks[k];
+          if (!validRank(r) || (validRank(o) && rankTotal(o) === rankTotal(r))) return;
+          myProfile.ranks[k] = { tier: r.tier, div: r.div, pct: r.pct || 0 };
+          myProfile.hist.push({ t: p.at, r: k, v: rankTotal(r) });
+        });
+        myProfile.updatedAt = p.at; changed = true;
+      }
+      if (changed) saveProfile();
+    }
+    renderFriends();
+  }
+  function watchFriends() {
+    friendUnsubs.forEach(u => { try { u(); } catch (e) {} }); friendUnsubs = []; friendProfiles = {};
+    if (db && authUser && me) (me.friends || []).forEach(uid => {
+      friendUnsubs.push(db.collection("profiles").doc(uid).onSnapshot(d => { friendProfiles[uid] = d.exists ? d.data() : null; renderFriends(); }, () => {}));
+    });
+    renderFriends();
+  }
+  async function addFriend(raw) {
+    const code = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const say = t => { flMsg = t; renderFriends(); };
+    if (!db || !authUser || !me || !me.name) return say("ログインして名前を決めると、フレンド登録できます");
+    if (code.length !== 6) return say("フレンドコードは6文字です");
+    if (myProfile && code === myProfile.code) return say("それは自分のコードです");
+    let hit = null;
+    try { const q = await db.collection("profiles").where("code", "==", code).limit(1).get(); if (!q.empty) hit = q.docs[0]; } catch (e) { return say("登録できませんでした。もう一度ためしてください"); }
+    if (!hit) return say(`コード「${code}」の人は見つかりませんでした`);
+    const name = (hit.data() || {}).name || "";
+    if ((me.friends || []).includes(hit.id)) return say(`${name}さんはもう登録しています`);
+    if ((me.friends || []).length >= 30) return say("フレンドは30人まで登録できます");
+    me.friends = [...(me.friends || []), hit.id];
+    await saveMe(); watchFriends(); say(`${name}さんを登録しました`);
+  }
+  // ランク値の差(1ディビジョン = 100%)。since より前の最後の記録と、いまのランクを比べる
+  function rankMove(prof, k, since) {
+    const cur = prof.ranks && prof.ranks[k]; if (!validRank(cur)) return null;
+    const hs = (prof.hist || []).filter(h => h && h.r === k).sort((a, b) => a.t - b.t);
+    if (!hs.length) return null;
+    let base = hs[0].v; hs.forEach(h => { if (h.t <= since) base = h.v; });
+    return rankTotal(cur) - base;
+  }
+  const ago = t => { if (!t) return "まだ記録がありません"; const m = Math.floor((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)}分前に更新` : m < 1440 ? `${Math.floor(m / 60)}時間前に更新` : `${Math.floor(m / 1440)}日前に更新`; };
+  function friendCard(prof, uid) {
+    const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+    const spans = [["今日", day0.getTime()], ["7日", Date.now() - 7 * 864e5], ["30日", Date.now() - 30 * 864e5]];
+    const rows = ROLES.map(([k, ja]) => {
+      const r = prof.ranks && prof.ranks[k];
+      if (!validRank(r)) return "";
+      const dl = spans.map(([lb, t]) => { const d = rankMove(prof, k, t); return `<span>${lb} <b class="${d > 0 ? "up" : d < 0 ? "down" : ""}">${d == null ? "−" : d === 0 ? "±0%" : (d > 0 ? "▲" : "▼") + Math.abs(d) + "%"}</b></span>`; }).join("");
+      return `<span class="rolebadge ${k}">${ja}</span><span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}<small class="pgn">${r.pct || 0}%</small></span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span><span class="dl">${dl}</span>`;
+    }).join("");
+    const self = !uid;
+    return `<div class="mcard${self ? " self" : ""}">
+      <div class="top"><span class="nm">${esc(prof.name || "?")}${self ? ` <small class="label">(自分)</small>` : ""}</span><span class="label">${ago(prof.updatedAt)}</span></div>
+      ${rows ? `<div class="flrow">${rows}</div>` : `<div class="label">ランクがまだ入っていません</div>`}
+      ${self ? "" : `<div class="acts"><button type="button" class="ghost del${pendingFlDel === uid ? " confirm" : ""}" data-fldel="${esc(uid)}">${pendingFlDel === uid ? "本当に外す" : "フレンドから外す"}</button></div>`}
+    </div>`;
+  }
+  function renderFriends() {
+    const panel = $("flPanel"); if (!panel) return;
+    panel.hidden = !auth;
+    if (!auth) return;
+    $("flMsg").textContent = flMsg;
+    if (!authUser || !me || !me.name) {
+      $("flMe").innerHTML = `<span class="hint">ログインして名前を決めると、自分のフレンドコードが出ます。</span>`;
+      $("flList").innerHTML = ""; return;
+    }
+    $("flMe").innerHTML = myProfile ? `<span class="label">自分のコード</span><span class="code nt">${esc(myProfile.code)}</span><button type="button" class="ghost primaryish" id="flCopy">フレンド登録リンクをコピー</button>` : `<span class="hint">読み込み中…</span>`;
+    const ids = me.friends || [];
+    $("flList").innerHTML = (myProfile ? friendCard(myProfile, "") : "")
+      + ids.map(uid => friendProfiles[uid] ? friendCard(friendProfiles[uid], uid) : uid in friendProfiles ? `<div class="mcard"><div class="label">見つからないフレンドです</div><div class="acts"><button type="button" class="ghost del" data-fldel="${esc(uid)}">外す</button></div></div>` : "").join("")
+      + (ids.length ? "" : `<div class="empty">まだフレンドがいません。友達のフレンドコードを上に入れて「登録」を押してください。</div>`);
+  }
+  $("flAdd").addEventListener("click", async () => { const v = $("flCode").value; await addFriend(v); if (/しました$/.test(flMsg)) $("flCode").value = ""; });
+  $("flCode").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("flAdd").click(); } });
+  $("flPanel").addEventListener("click", async e => {
+    const cp = e.target.closest("#flCopy");
+    if (cp && myProfile) {
+      const url = location.origin + location.pathname + "#f_" + myProfile.code;
+      try { await navigator.clipboard.writeText(url); cp.textContent = "コピーしました ✓"; setTimeout(() => { cp.textContent = "フレンド登録リンクをコピー"; }, 2000); flMsg = "LINEやDiscordで送ってください。開くと、その人のフレンドにあなたが登録されます。"; }
+      catch (err) { flMsg = "このリンクを送ってください: " + url; }
+      $("flMsg").textContent = flMsg; return;
+    }
+    const del = e.target.closest("[data-fldel]");
+    if (del && me) {
+      const uid = del.dataset.fldel;
+      if (pendingFlDel !== uid && friendProfiles[uid]) { pendingFlDel = uid; renderFriends(); return; }
+      pendingFlDel = ""; me.friends = (me.friends || []).filter(f => f !== uid); flMsg = "";
+      await saveMe(); watchFriends();
+    }
+  });
   async function startAuth() {
     try {
       await loadScript("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js");
@@ -2807,13 +2953,15 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     auth.onAuthStateChanged(async u => {
       authUser = u; me = null; nameEditing = false;
       if (u) {
-        try { const d = await db.collection("users").doc(u.uid).get(); const v = d.exists ? d.data() : null; if (v) me = { name: String(v.name || ""), groups: Array.isArray(v.groups) ? v.groups.filter(g => typeof g === "string") : [] }; } catch (e) {}
+        try { const d = await db.collection("users").doc(u.uid).get(); const v = d.exists ? d.data() : null; if (v) me = { name: String(v.name || ""), groups: Array.isArray(v.groups) ? v.groups.filter(g => typeof g === "string") : [], friends: Array.isArray(v.friends) ? v.friends.filter(f => typeof f === "string") : [] }; } catch (e) {}
         if (me && group.name && !me.groups.includes(group.name)) { me.groups = [group.name, ...me.groups].slice(0, 12); saveMe(); }
         if (me && !group.name && me.groups.length && !lsGet("ow-group-chosen")) joinGroup(me.groups[0]);
         useMyName();
       }
       canWrite = !!(u && me && me.name);
       renderAcct(); setStatus(); updateSubmit(); updateDSubmit();
+      await loadMyProfile(); watchFriends();
+      if (u && me && me.name && pendingFriend) { const c = pendingFriend; pendingFriend = ""; addFriend(c); setPage("team", "friends"); }
     });
   }
   $("gJoin").addEventListener("click", () => { const v = $("gInput").value.trim(); if (!v) { $("gInput").focus(); return; } $("gInput").value = ""; joinGroup(v); });
@@ -2848,6 +2996,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     db = window.claude ? await window.claude.use("db") : await siteDb();
     if (!db) { setStatus(); updateSubmit(); return; }
     if (onSite) { canWrite = false; await startAuth(); }
+    renderFriends();
     try { const user = await window.claude.use("user"); if (user && (await user.can("data.write")) === false) canWrite = false; } catch (e) {}
     connect();
   })();

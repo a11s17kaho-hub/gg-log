@@ -1,6 +1,6 @@
 rules_version = '2';
 // 見るのはだれでもOK。書き込み・削除は Google でログインした人だけ。1件の大きさを制限する
-// users/{uid} は本人だけが読み書きできる(記録に使う名前と、入ったグループ)
+// users/{uid} は本人だけが読み書きできる(記録に使う名前と、入ったグループ、フレンド)
 service cloud.firestore {
   match /databases/{database}/documents {
     function okCol(c) { return c in ['matches', 'players', 'duels']; }
@@ -19,6 +19,15 @@ service cloud.firestore {
     // 全体ランキング用(全グループの試合をまとめて読む)
     match /{path=**}/matches/{id} {
       allow read: if true;
+    }
+    // profiles/{uid} はフレンド登録用。ログインした人ならだれでも読める(名前・フレンドコード・ランクとその推移だけ)。書けるのは本人だけ
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.size() <= 6
+        && request.resource.data.code is string && request.resource.data.code.size() == 6
+        && request.resource.data.hist is list && request.resource.data.hist.size() <= 200;
     }
     match /users/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
