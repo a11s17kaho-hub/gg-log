@@ -1418,7 +1418,6 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("mapBtn").addEventListener("click", () => openPicker({ kind: "map" }));
   { const lm = lsGet("ow-last-map"); setMap(MAP_TYPE[lm] ? lm : "Busan"); }
 
-  let dupConfirm = "";
   $("form").addEventListener("submit", async e => {
     e.preventDefault();
     if (!col || !form.result) return;
@@ -1443,19 +1442,44 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       doc.uids = [...new Set([...(old.uids || []), ...(doc.uids || [])])];
       Object.assign(doc, { date: old.date, createdAt: old.createdAt || Date.now(), by: old.by || "", editedBy: myName() || "", editedAt: Date.now() });
     }
-    // 二重記録の防止: 30分以内に、同じマップ・結果・モードで、同じメンバーが入った試合がもう記録されていたら一度止める
+    // 同じ試合をフレンドがもう記録していたら、新しく作らずにその記録へまとめる(2人とも入れても二重にならない)
+    // 同じ試合 = 30分以内・同じマップ・同じ結果・同じモードで、メンバーが1人以上かぶる
     if (!old) {
       const names = new Set(doc.members.map(x => x.name));
       const dup = matches.find(m => m.map === doc.map && m.result === doc.result && m.queue === doc.queue && Math.abs(doc.createdAt - (m.createdAt || 0)) < 30 * 60000 && (m.members || []).some(x => names.has(x.name)));
-      const key = dup ? dup.id + "|" + doc.map + "|" + doc.result : "";
-      if (dup && dupConfirm !== key) {
-        dupConfirm = key;
-        const mins = Math.max(1, Math.round((doc.createdAt - (dup.createdAt || 0)) / 60000));
-        $("toast").textContent = `${dup.by ? dup.by + "さんが" : ""}${mins}分前に、${doc.map}の${RES_LABEL[doc.result]}をもう記録しています(${(dup.members || []).map(x => x.name).join("・")})。同じ試合なら記録しなくてOKです。別の試合なら、もう一度「記録する」を押してください。`;
+      if (dup) {
+        const mine = myName();
+        const merged = (dup.members || []).map(y => {
+          const x = doc.members.find(z => z.name === y.name); if (!x) return y;
+          // 自分の行は自分の入力を優先。ほかの人の行は、空いているところだけ埋める
+          if (x.name === mine) return { ...y, hero: x.hero || y.hero, role: x.role || y.role, delta: x.delta != null ? x.delta : y.delta, ...(x.uid ? { uid: x.uid } : {}) };
+          return { ...y, hero: y.hero || x.hero, role: y.role || x.role, delta: y.delta != null ? y.delta : x.delta };
+        });
+        doc.members.forEach(x => { if (!merged.some(y => y.name === x.name) && merged.length < 6) merged.push(x); });
+        const mdoc = { ...dup, members: merged,
+          enemies: (dup.enemies && dup.enemies.length ? dup.enemies : doc.enemies).slice(0, 6),
+          allies: (dup.allies && dup.allies.length ? dup.allies : doc.allies).slice(0, allyMax()),
+          uids: [...new Set([...(dup.uids || []), ...(doc.uids || [])])],
+          note: dup.note || doc.note, mergedBy: mine, mergedAt: Date.now() };
+        delete mdoc.id;
+        $("submit").disabled = true;
+        try {
+          await col.doc(dup.id).set(mdoc);
+          gMatches = null;
+          // ランクは前とのちがいの分だけ動かす
+          const net = new Map();
+          (dup.members || []).forEach(x => { if (x.delta && x.role) net.set(x.name + "|" + x.role, (net.get(x.name + "|" + x.role) || 0) - x.delta); });
+          merged.forEach(x => { if (x.delta && x.role) net.set(x.name + "|" + x.role, (net.get(x.name + "|" + x.role) || 0) + x.delta); });
+          let notes = [];
+          try { notes = await applyRankChanges([...net].filter(([, d]) => d).map(([k, d]) => { const [name, role] = k.split("|"); return { name, role, delta: d }; }), 1); } catch (err) {}
+          $("toast").textContent = `${dup.by && dup.by !== mine ? dup.by + "さんが記録した" : "さっき記録した"}同じ試合(${doc.map}で${RES_LABEL[doc.result]})にまとめました` + (notes.length ? `。${notes.join("、")}なりました` : "");
+          form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
+          form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips();
+        } catch (err) { $("toast").textContent = "保存できませんでした。通信を確認してもう一度押してください。"; }
+        updateSubmit();
         return;
       }
     }
-    dupConfirm = "";
     $("submit").disabled = true;
     try {
       if (old) await col.doc(old.id).set(doc); else await col.add(doc);
