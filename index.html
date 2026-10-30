@@ -1193,7 +1193,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   // ---- 状態
   let db = null, col = null, pcol = null, canWrite = true;
   let auth = null, authUser = null, me = null, nameEditing = false;
-  let matches = [], players = {}, playersReady = false;
+  let matches = [], players = {}, playersReady = false, matchesReady = false;
   let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null, editingMatch = null;
   const form = { result: null, queue: "ランク", members: [], enemies: [], allies: [] };
 
@@ -1466,6 +1466,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         try {
           await col.doc(dup.id).set(mdoc);
           gMatches = null;
+          sendToFriends({ ...mdoc, members: doc.members }, mdoc.uids);
           // ランクは前とのちがいの分だけ動かす
           const net = new Map();
           (dup.members || []).forEach(x => { if (x.delta && x.role) net.set(x.name + "|" + x.role, (net.get(x.name + "|" + x.role) || 0) - x.delta); });
@@ -1484,11 +1485,12 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     try {
       if (old) await col.doc(old.id).set(doc); else await col.add(doc);
       gMatches = null;
+      const sentTo = old ? [] : await sendToFriends(doc);
       let notes = [];
       try { if (old) await applyRankChanges(old.members || [], -1); notes = await applyRankChanges(doc.members, 1); } catch (err) {}
       lsSet("ow-last-members", JSON.stringify(form.members.map(m => ({ name: m.name, hero: m.hero, role: m.role }))));
       lsSet("ow-last-queue", form.queue);
-      $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "");
+      $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "") + (sentTo.length ? `。${sentTo.join("・")}さんの記録にも入ります` : "");
       if (old) endEdit();
       form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
       form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips();
@@ -2710,9 +2712,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     $("gHint").textContent = group.id ? `コード「${group.name}」の仲間だけのGGログ。招待リンクで仲間を呼べます。` : "だれでも入れる共通ロビー。コードを決めて JOIN すると、仲間だけのスクワッドができます。";
     $("gLeave").hidden = !group.id;
   }
+  let connGen = 0;
   function connect() {
+    connGen++;
     unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = [];
-    matches = []; players = {}; playersReady = false; isSample = true; editing = null; pendingDel = null;
+    matches = []; players = {}; playersReady = false; matchesReady = false; isSample = true; editing = null; pendingDel = null;
     duels = []; dIsSample = true; dPendingDel = null;
     showGroup(); render();
     if (!db) return;
@@ -2722,14 +2726,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const fail = () => { const s = $("status"); s.hidden = false; s.textContent = "共有データの読み込みに失敗しました。ページを開き直してください。"; };
     unsubs.push(col.onSnapshot(snap => {
       matches = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.result && m.date);
-      isSample = matches.length === 0;
-      setStatus(); updateSubmit(); render();
+      isSample = matches.length === 0; matchesReady = true;
+      setStatus(); updateSubmit(); render(); importInbox();
     }, fail));
     unsubs.push(pcol.onSnapshot(snap => {
       const next = {};
       snap.docs.forEach(d => { const v = d.data(); if (v && typeof v.name === "string") next[v.name] = { name: v.name, ranks: v.ranks || {}, platform: v.platform || "", at: v.updatedAt || 0 }; });
       players = next; playersReady = true;
-      renderMembers(); renderAcct(); syncProfile();
+      renderMembers(); renderAcct(); syncProfile(); importInbox();
       if (!isSample) render();
     }, fail));
     unsubs.push(dcol.onSnapshot(snap => {
@@ -2981,6 +2985,80 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       await saveMe(); watchFriends();
     }
   });
+
+  // ---- フレンドが記録した試合を受け取る
+  // inbox/{uid}/items に、フレンドが「自分が入った試合」を置いていく。開いたときに今のスクワッドへ取り込み、自分のランクも動かす
+  // 送った人と同じスクワッドに入っていれば、そこにもう試合があるので取り込まない
+  async function sendToFriends(d, skipUids = []) {
+    const sent = [];
+    if (!db || !authUser || !me || !me.name) return sent;
+    const names = new Set((d.members || []).map(x => x.name));
+    for (const uid of me.friends || []) {
+      const fp = friendProfiles[uid];
+      if (!fp || !fp.name || fp.name === me.name || !names.has(fp.name) || skipUids.includes(uid)) continue;
+      try {
+        await db.collection(`inbox/${uid}/items`).add({ fromUid: authUser.uid, result: d.result, map: d.map || "", queue: d.queue || "", date: d.date, members: d.members || [], enemies: d.enemies || [], allies: d.allies || [], note: d.note || "", createdAt: d.createdAt || Date.now(), by: me.name, forName: fp.name, fromGroup: group.id });
+        sent.push(fp.name);
+      } catch (e) {}
+    }
+    return sent;
+  }
+  // 自分のランクを delta だけ動かす。スクワッドよりプロフィールのほうが新しければ、そちらを元にする
+  async function moveMyRank(role, delta) {
+    if (!role || !delta || !pcol) return "";
+    const p = players[me.name] || { ranks: {}, platform: "", at: 0 };
+    const pr = myProfile && myProfile.ranks[role];
+    let r = p.ranks && p.ranks[role];
+    if (validRank(pr) && (!validRank(r) || (myProfile.updatedAt || 0) > (p.at || 0))) r = pr;
+    if (!validRank(r)) return "";
+    const next = fromTotal(rankTotal(r) + delta), now = Date.now();
+    const ranks = { ...p.ranks, [role]: next };
+    await pcol.doc(pid(me.name)).set({ name: me.name, ranks, platform: p.platform || "", updatedAt: now });
+    players[me.name] = { name: me.name, ranks, platform: p.platform || "", at: now };
+    syncProfile();
+    return next.tier !== r.tier || next.div !== r.div ? `${ROLE_JA[role]}が${rankLabel(next)}に` : "";
+  }
+  let importing = false;
+  async function importInbox() {
+    if (importing || !db || !authUser || !me || !me.name || !col || !pcol || !matchesReady || !playersReady) return;
+    importing = true;
+    const gen = connGen, got = [], notes = [];
+    try {
+      const q = await db.collection(`inbox/${authUser.uid}/items`).get();
+      for (const d of q.docs) {
+        if (gen !== connGen) break; // とちゅうでスクワッドを切りかえたら、残りは次に開いたときに
+        const it = d.data() || {};
+        const mine = (it.members || []).find(x => x.name === it.forName);
+        const here = it.fromGroup === group.id || (it.fromGroup && (me.groups || []).includes(nameOfGid(it.fromGroup)));
+        if (mine && !here && it.result && it.date) {
+          const row = { ...mine, name: me.name, uid: authUser.uid };
+          const members = (it.members || []).map(x => x === mine ? row : x).slice(0, 6);
+          const names = new Set(members.map(x => x.name));
+          const dup = matches.find(m => m.map === it.map && m.result === it.result && m.queue === it.queue && Math.abs((it.createdAt || 0) - (m.createdAt || 0)) < 30 * 60000 && (m.members || []).some(x => names.has(x.name)));
+          let delta = row.delta, role = row.role;
+          if (gen !== connGen) break;
+          if (dup) {
+            const y = (dup.members || []).find(x => x.name === me.name);
+            if (y && y.delta != null) delta = 0; // 自分の分はもう入っている
+            else {
+              const merged = y ? dup.members.map(x => x === y ? { ...x, hero: x.hero || row.hero, role: x.role || row.role, delta: row.delta, uid: authUser.uid } : x) : [...(dup.members || []), row].slice(0, 6);
+              role = (y && y.role) || row.role;
+              const { id, ...rest } = dup;
+              await col.doc(dup.id).set({ ...rest, members: merged, uids: [...new Set([...(dup.uids || []), authUser.uid])], mergedBy: it.by || "", mergedAt: Date.now() });
+            }
+          } else {
+            await col.add({ result: it.result, map: it.map, queue: it.queue, date: it.date, members, enemies: (it.enemies || []).slice(0, 6), allies: (it.allies || []).slice(0, 6), note: String(it.note || "").slice(0, 80), createdAt: it.createdAt || Date.now(), by: it.by || "", uids: [authUser.uid, ...(typeof it.fromUid === "string" ? [it.fromUid] : [])], importedFrom: it.by || "" });
+          }
+          if (delta && gen === connGen) { const n = await moveMyRank(role, delta); if (n) notes.push(n); }
+          got.push(it.by || "フレンド");
+        }
+        await d.ref.delete();
+      }
+    } catch (e) {}
+    importing = false;
+    if (gen !== connGen) { importInbox(); return; }
+    if (got.length) { gMatches = null; $("toast").textContent = `${[...new Set(got)].join("・")}さんが記録した試合を${got.length}件、あなたの記録に入れました` + (notes.length ? `。${notes.join("、")}なりました` : ""); }
+  }
   async function startAuth() {
     try {
       await loadScript("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js");
@@ -2998,7 +3076,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       }
       canWrite = !!(u && me && me.name);
       renderAcct(); setStatus(); updateSubmit(); updateDSubmit();
-      await loadMyProfile(); watchFriends();
+      await loadMyProfile(); watchFriends(); importInbox();
       if (u && me && me.name && pendingFriend) { const c = pendingFriend; pendingFriend = ""; addFriend(c); setPage("team", "friends"); }
     });
   }

@@ -29,6 +29,11 @@ service cloud.firestore {
         && request.resource.data.code is string && request.resource.data.code.size() == 6
         && request.resource.data.hist is list && request.resource.data.hist.size() <= 200;
     }
+    // inbox/{uid}/items は、フレンドが「いっしょに遊んだ試合」を届ける箱。ログインした人ならだれでも置ける。読む・消すのは本人だけ
+    match /inbox/{uid}/items/{id} {
+      allow create: if signedIn() && request.resource.data.size() <= 20;
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+    }
     match /users/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.size() <= 5;
