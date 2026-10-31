@@ -562,7 +562,6 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .col > section[aria-label="絞り込み"] { order: -2; }
 .col > section[aria-labelledby="h-fhero"] { order: -1; }
 .fhlist { display: flex; flex-direction: column; gap: 6px; }
-.autoamt { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
 details.more { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 12px; }
 details.more > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); list-style: none; }
 details.more > summary::before { content: "＋ "; }
@@ -681,7 +680,7 @@ details.more[open] > summary { margin-bottom: 10px; }
             <button type="button" class="ghost" id="memAdd">追加</button>
           </div>
           <div class="known" id="known"></div>
-          <p class="hint">メンバー・ヒーロー・マップ・モードは前回のまま残ります。ランク戦では WIN / LOSE を押すと、その人のいつもの上がり幅(%)が自動で入ります。ちがうときだけ直してください。</p>
+          <p class="hint">メンバー・ヒーロー・マップ・モードは前回のまま残ります。ランク戦では、試合後に出る「+25%」「−20%」などを入れると、そのメンバーの現在ランクが自動で上下します。</p>
         </div>
         <details class="more" id="more"><summary>くわしく入力する(味方・相手のヒーロー・メモ)<small>任意</small></summary>
         <div class="field zone">
@@ -1220,30 +1219,10 @@ details.more[open] > summary { margin-bottom: 10px; }
   $("resultSeg").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     form.result = b.dataset.v; setPressed($("resultSeg"), form.result);
-    // 勝ちなら▲、負けなら▼を初期値に。%は自分で直していなければ、その人のいつもの幅を入れる
+    // 勝ちなら▲、負けなら▼を初期値に
     if (form.result !== "draw") form.members.forEach(m => m.dir = form.result === "win" ? 1 : -1);
-    fillAutoAmt();
     renderMembers(); updateSubmit();
   });
-  // その人(とロール)の、最近の同じ向きの変動%の真ん中の値。記録がなければ20%
-  function typicalAmt(name, role, dir) {
-    const vs = [];
-    for (const m of [...matches].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) {
-      const x = (m.members || []).find(x => x.name === name);
-      if (x && x.delta && Math.sign(x.delta) === dir && (!role || !x.role || x.role === role)) vs.push(Math.abs(x.delta));
-      if (vs.length >= 8) break;
-    }
-    if (!vs.length) return 20;
-    vs.sort((a, b) => a - b);
-    return Math.max(1, Math.round(vs[Math.floor(vs.length / 2)]));
-  }
-  function fillAutoAmt() {
-    form.members.forEach(m => {
-      if (m.touched) return;
-      if (form.result === "draw" || !form.result) { m.amt = ""; m.auto = false; return; }
-      m.amt = String(typicalAmt(m.name, m.role, m.dir)); m.auto = true;
-    });
-  }
   $("queueSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; form.queue = b.dataset.v; syncQueue(); });
   syncQueue();
 
@@ -1260,7 +1239,7 @@ details.more[open] > summary { margin-bottom: 10px; }
     let hero = "", role = "";
     for (const m of [...matches].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const x = (m.members || []).find(x => x.name === name); if (x) { hero = x.hero || ""; role = x.role || ""; break; } }
     form.members.push({ name, hero, role, dir: form.result === "loss" ? -1 : 1, amt: "" });
-    fillAutoAmt(); renderMembers();
+    renderMembers();
   }
   function renderMembers() {
     renderAllyChips();
@@ -1275,7 +1254,7 @@ details.more[open] > summary { margin-bottom: 10px; }
           <span class="label">ランク</span>
           <button type="button" data-dir="1" aria-pressed="${m.dir === 1}">▲上がった</button>
           <button type="button" data-dir="-1" aria-pressed="${m.dir === -1}">▼下がった</button>
-          <input type="text" inputmode="numeric" id="amt-${i}" class="amt" placeholder="0" value="${esc(m.amt)}" maxlength="3" aria-label="${esc(m.name)}の変動%"><span class="label">%</span>${m.auto && m.amt ? `<span class="autoamt" title="最近の記録から自動で入れました。ちがったら直してください">いつもの幅</span>` : ""}
+          <input type="text" inputmode="numeric" id="amt-${i}" class="amt" placeholder="0" value="${esc(m.amt)}" maxlength="3" aria-label="${esc(m.name)}の変動%"><span class="label">%</span>
         </div>
         <div class="memrow delta quick">${[10, 15, 20, 25, 30].map(v => `<button type="button" data-amt="${v}" aria-pressed="${String(m.amt) === String(v)}">${v}%</button>`).join("")}</div>
         <div class="memrow currank">${curRank(m, i)}</div>
@@ -1317,15 +1296,15 @@ details.more[open] > summary { margin-bottom: 10px; }
     const rb = e.target.closest("[data-role]");
     if (rb) { m.role = m.role === rb.dataset.role ? "" : rb.dataset.role; renderMembers(); return; }
     const db_ = e.target.closest("[data-dir]");
-    if (db_) { m.dir = +db_.dataset.dir; if (m.auto) m.amt = String(typicalAmt(m.name, m.role, m.dir)); renderMembers(); return; }
+    if (db_) { m.dir = +db_.dataset.dir; renderMembers(); return; }
     const qa = e.target.closest("[data-amt]");
-    if (qa) { m.amt = qa.dataset.amt; m.touched = true; m.auto = false; renderMembers(); return; }
+    if (qa) { m.amt = qa.dataset.amt; renderMembers(); return; }
     const pk = e.target.closest("[data-pick]");
     if (pk) openPicker({ kind: "ally", i: +pk.dataset.pick });
   });
   $("members").addEventListener("input", e => {
     const row = e.target.closest(".mem"); if (!row) return; const m = form.members[+row.dataset.i];
-    if (e.target.classList.contains("amt")) { e.target.value = e.target.value.replace(/[^0-9]/g, ""); m.amt = e.target.value; m.touched = true; m.auto = false; const t = row.querySelector(".autoamt"); if (t) t.remove(); }
+    if (e.target.classList.contains("amt")) { e.target.value = e.target.value.replace(/[^0-9]/g, ""); m.amt = e.target.value; }
   });
   $("known").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b) addMember(b.dataset.k); });
   $("memAdd").addEventListener("click", () => { addMember($("memName").value); $("memName").value = ""; $("memName").focus(); });
@@ -1505,7 +1484,7 @@ details.more[open] > summary { margin-bottom: 10px; }
           try { notes = await applyRankChanges([...net].filter(([, d]) => d).map(([k, d]) => { const [name, role] = k.split("|"); return { name, role, delta: d }; }), 1); } catch (err) {}
           $("toast").textContent = `${dup.by && dup.by !== mine ? dup.by + "さんが記録した" : "さっき記録した"}同じ試合(${doc.map}で${RES_LABEL[doc.result]})にまとめました` + (notes.length ? `。${notes.join("、")}なりました` : "");
           form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
-          form.members.forEach(m => { m.amt = ""; m.touched = false; m.auto = false; }); form.enemies = []; form.allies = []; $("more").open = false; renderMembers(); renderEnemyChips(); renderAllyChips();
+          form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; $("more").open = false; renderMembers(); renderEnemyChips(); renderAllyChips();
         } catch (err) { $("toast").textContent = "保存できませんでした。通信を確認してもう一度押してください。"; }
         updateSubmit();
         return;
@@ -1523,7 +1502,7 @@ details.more[open] > summary { margin-bottom: 10px; }
       $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "") + (sentTo.length ? `。${sentTo.join("・")}さんの記録にも入ります` : "");
       if (old) endEdit();
       form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
-      form.members.forEach(m => { m.amt = ""; m.touched = false; m.auto = false; }); form.enemies = []; form.allies = []; $("more").open = false; renderMembers(); renderEnemyChips(); renderAllyChips();
+      form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; $("more").open = false; renderMembers(); renderEnemyChips(); renderAllyChips();
     } catch (err) {
       if (err && err.code === "invalid_argument") { canWrite = false; setStatus(); $("toast").textContent = "このページへの書き込み権限がありません。持ち主に編集者として招待してもらってください。"; }
       else $("toast").textContent = "保存できませんでした。通信を確認してもう一度押してください。";
@@ -2037,7 +2016,7 @@ details.more[open] > summary { margin-bottom: 10px; }
     form.result = m.result; setPressed($("resultSeg"), m.result);
     form.queue = QUEUES.includes(m.queue) ? m.queue : form.queue; syncQueue();
     if (m.map) setMap(m.map);
-    form.members = (m.members || []).slice(0, 6).map(x => ({ name: x.name, hero: x.hero || "", role: x.role || "", dir: x.delta < 0 ? -1 : 1, amt: x.delta ? String(Math.abs(x.delta)) : "", touched: true }));
+    form.members = (m.members || []).slice(0, 6).map(x => ({ name: x.name, hero: x.hero || "", role: x.role || "", dir: x.delta < 0 ? -1 : 1, amt: x.delta ? String(Math.abs(x.delta)) : ""}));
     form.enemies = (m.enemies || []).slice(0, 6); form.allies = (m.allies || []).slice(0, 6);
     $("note").value = m.note || "";
     $("more").open = !!(form.enemies.length || form.allies.length || m.note);
