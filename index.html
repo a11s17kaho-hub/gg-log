@@ -942,7 +942,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const DUEL_MAP_TYPE = {};
   DUEL_MAPS.forEach(([t, ms]) => ms.forEach(m => DUEL_MAP_TYPE[m] = t));
   // アリーナには専用の絵がないので、雰囲気の近いマップの絵を借りる
-  const MAP_ART_ALIAS = { "Busan Sanctuary": "Busan", "Ilios Ruins": "Ilios", "Lijiang Tower Night Market": "Lijiang Tower", "Nepal Shrine": "Nepal", "Oasis Gardens": "Oasis", "Oasis University": "Oasis", "Samoa Volcano": "Samoa", "Lijiang Tower: Control Center": "Lijiang Tower", "Black Forest": "Eichenwalde", "Castillo": "Dorado", "Ecopoint: Antarctica": "Antarctic Peninsula", "Necropolis": "Throne of Anubis", "Château Guillard": "King's Row", "Kanezaka": "Hanaoka", "Malevento": "Rialto", "Petra": "Aatlis" };
+  const MAP_ART_ALIAS = { "Lijiang Tower: Control Center": "Lijiang Tower", "Black Forest": "Eichenwalde", "Castillo": "Dorado", "Ecopoint: Antarctica": "Antarctic Peninsula", "Necropolis": "Throne of Anubis", "Château Guillard": "King's Row", "Kanezaka": "Hanaoka", "Malevento": "Rialto", "Petra": "Aatlis" };
   const MODE_ICON = {
     "コントロール": '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>',
     "エスコート": '<rect x="3" y="8" width="13" height="8" rx="1.5"/><path d="M16 11h3l2 3v2h-5"/><circle cx="7" cy="18" r="1.6" fill="currentColor"/><circle cx="17" cy="18" r="1.6" fill="currentColor"/>',
@@ -969,12 +969,12 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     support: '<path d="M27 16h10v11h11v10H37v11H27V37H16V27h11z"/>',
     other: '<circle cx="32" cy="32" r="12"/>',
   };
-  // ---- 友達用: 公式画像(heroes/*.jpg, maps/*.jpg)があればそれを使い、なければオリジナル絵
+  // ---- オリジナル絵(heroes/*.jpg, maps/*.jpg)があればそれを使い、なければコードで描いた絵
   const fileKey = (s, sep) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, sep).replace(/^_|_$/g, "");
   const HERO_KEY = {};
   Object.keys(HEROES).forEach(r => HEROES[r].forEach((h, i) => HERO_KEY[h] = fileKey(HERO_EN[r][i], "")));
-  const OFFICIAL_HEROES = new Set();
-  const OFFICIAL_MAPS = new Set();
+  const OFFICIAL_HEROES = new Set(["Ana", "Anran", "Ashe", "Baptiste", "Bastion", "Brigitte", "Cassidy", "DMon", "DVa", "Doctrine", "Domina", "Doomfist", "Echo", "Emre", "Freja", "Genji", "Hanzo", "Hazard", "Illari", "JetpackCat", "JunkerQueen", "Junkrat", "Juno", "Kiriko", "Lifeweaver", "Lucio", "Mauga", "Mei", "Mercy", "Mizuki", "Moira", "Orisa", "Pharah", "Ramattra", "Reaper", "Reinhardt", "Roadhog", "Shion", "Sierra", "Sigma", "Sojourn", "Soldier76", "Sombra", "Symmetra", "Torbjorn", "Tracer", "Vendetta", "Venture", "Widowmaker", "Winston", "WreckingBall", "Wuyang", "Zarya", "Zenyatta"]);
+  const OFFICIAL_MAPS = new Set(["Arena_Victoriae", "Gogadoro", "Wuxing_University", "Place_Lacroix", "Redwood_Dam", "Serenza", "Powder_Keg_Mine", "Thames_District", "Aatlis", "Antarctic_Peninsula", "Blizzard_World", "Busan", "Circuit_Royal", "Colosseo", "Dorado", "Eichenwalde", "Esperanca", "Hanaoka", "Havana", "Hollywood", "Ilios", "Junkertown", "King_s_Row", "Lijiang_Tower", "Midtown", "Neon_Junction", "Nepal", "New_Junk_City", "New_Queen_Street", "Numbani", "Oasis", "Paraiso", "Rialto", "Route_66", "Runasapi", "Samoa", "Shambali_Monastery", "Suravasa", "Throne_of_Anubis", "Watchpoint_Gibraltar", "Watchpoint_Grimsvotn", "Busan_Sanctuary", "Ilios_Ruins", "Lijiang_Tower_Night_Market", "Nepal_Shrine", "Oasis_Gardens", "Oasis_University", "Samoa_Volcano"]);
   function heroImg(name, role) {
     const k = HERO_KEY[name];
     if (!k || !OFFICIAL_HEROES.has(k)) return "";
