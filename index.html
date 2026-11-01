@@ -562,6 +562,9 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .col > section[aria-label="絞り込み"] { order: -2; }
 .col > section[aria-labelledby="h-fhero"] { order: -1; }
 .fhlist { display: flex; flex-direction: column; gap: 6px; }
+.photobar { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--accent); border-radius: 10px; padding: 10px; }
+.photobtn { font-size: 15px; padding: 12px; }
+.photobar .hint.ok { color: var(--accent); }
 details.more { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 12px; }
 details.more > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); list-style: none; }
 details.more > summary::before { content: "＋ "; }
@@ -655,6 +658,11 @@ details.more[open] > summary { margin-bottom: 10px; }
     <section class="panel" aria-labelledby="h-add">
       <h2 id="h-add">試合を記録</h2>
       <form id="form" autocomplete="off" class="ranked">
+        <div class="photobar" id="photoBar" hidden>
+          <button type="button" class="ghost primaryish photobtn" id="photoBtn">📷 ランク画面を撮って入れる</button>
+          <input type="file" id="photoIn" accept="image/*" capture="environment" hidden>
+          <span class="hint" id="photoMsg">ランク戦の試合後に出る画面(ランクと「ランク進行度」が出るところ)を撮ると、勝敗・ロール・%・ヒーローが入ります。写真は保存しません。</span>
+        </div>
         <div class="field">
           <span class="label">結果</span>
           <div class="seg" id="resultSeg">
@@ -1327,6 +1335,82 @@ details.more[open] > summary { margin-bottom: 10px; }
     return notes;
   }
 
+
+  // ---- ランク画面の写真から読み取る
+  // 写真は縮めてから読み取り用のサーバー(firebase-config.js の OW_READER)へ送り、結果だけを受け取る。写真はどこにも保存しない
+  const READER = window.OW_READER || "";
+  let readRank = null;
+  async function fixReadRank() {
+    const rr = readRank; readRank = null;
+    if (!rr || !pcol || Date.now() - rr.at > 30 * 60000) return "";
+    const p = players[rr.name], r = p && p.ranks[rr.role];
+    if (validRank(r) && r.tier === rr.tier && r.div === rr.div) return "";
+    const ranks = { ...(p ? p.ranks : {}), [rr.role]: { tier: rr.tier, div: rr.div, pct: validRank(r) ? (tpos(rr.tier) * 5 - rr.div > tpos(r.tier) * 5 - r.div ? 0 : 99) : 0 } };
+    await pcol.doc(pid(rr.name)).set({ name: rr.name, ranks, platform: (p && p.platform) || "", updatedAt: Date.now() });
+    players[rr.name] = { name: rr.name, ranks, platform: (p && p.platform) || "", at: Date.now() };
+    if (rr.name === myName()) syncProfile();
+    return `${rr.name}の${ROLE_JA[rr.role]}を画面に合わせて${TIERS[rr.tier][0]} ${rr.div}にしました`;
+  }
+  const normName = t => String(t || "").replace(/[\s・·:：.\-]/g, "").toLowerCase();
+  const heroByName = t => { const n = normName(t); if (!n) return ""; return Object.keys(HERO_ROLE).find(h => normName(h) === n) || Object.keys(HERO_ROLE).find(h => normName(h).startsWith(n) || n.startsWith(normName(h))) || ""; };
+  function shrinkPhoto(file) {
+    return new Promise((ok, ng) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        ok(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); ng(new Error("img")); };
+      img.src = url;
+    });
+  }
+  function applyReading(v) {
+    const said = [];
+    if (["win", "loss", "draw"].includes(v.result)) { form.result = v.result; setPressed($("resultSeg"), v.result); said.push(RES_LABEL[v.result]); }
+    form.queue = "ランク"; syncQueue();
+    const name = myName() || (form.members[0] && form.members[0].name);
+    if (name && !form.members.some(m => m.name === name)) addMember(name);
+    const m = form.members.find(x => x.name === name);
+    if (m) {
+      const role = ["tank", "damage", "support"].includes(v.role) ? v.role : "";
+      const heroes = (Array.isArray(v.heroes) ? v.heroes : []).map(heroByName).filter(Boolean);
+      const hero = heroes.find(h => !role || HERO_ROLE[h] === role) || "";
+      if (role) { m.role = role; said.push(ROLE_JA[role]); }
+      if (hero) { m.hero = hero; if (!m.role) m.role = HERO_ROLE[hero]; said.push(hero); }
+      if (Number.isFinite(v.delta)) { const d = Math.round(v.delta); m.dir = d < 0 ? -1 : 1; m.amt = d ? String(Math.min(100, Math.abs(d))) : ""; said.push((d > 0 ? "+" : d < 0 ? "−" : "±") + Math.abs(d) + "%"); }
+      else if (form.result !== "draw") m.dir = form.result === "loss" ? -1 : 1;
+      // 画面のランク(試合後)と、ここで計算するランクがずれていたら知らせる
+      const ti = TIERS.findIndex(t => t[0] === v.tier);
+      if (ti >= 0 && v.div >= 1 && v.div <= 5) {
+        said.push(`${v.tier} ${v.div}`);
+        // 記録したあと、計算したランクが画面とちがえば画面のほうに合わせる(降格保護などで%どおりに動かないことがある)
+        if (m.role) readRank = { name, role: m.role, tier: ti, div: v.div, at: Date.now() };
+      }
+    }
+    renderMembers(); updateSubmit();
+    return said;
+  }
+  if (READER) $("photoBar").hidden = false;
+  $("photoBtn").addEventListener("click", () => $("photoIn").click());
+  $("photoIn").addEventListener("change", async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+    const msg = $("photoMsg"), btn = $("photoBtn");
+    msg.classList.remove("ok"); msg.textContent = "読み取り中…(数秒かかります)"; btn.disabled = true;
+    try {
+      const image = await shrinkPhoto(f);
+      const r = await fetch(READER, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image }) });
+      const v = await r.json();
+      if (!r.ok || v.error) throw new Error(v.error || "http");
+      if (v.screen && v.screen !== "rank") { msg.textContent = "ランク画面が見つかりませんでした。ランクと「ランク進行度」が出ている画面を、画面いっぱいに撮ってください。"; return; }
+      const said = applyReading(v);
+      msg.classList.add("ok");
+      msg.textContent = said.length ? `読み取りました: ${said.join(" / ")}。マップを選んで、合っていれば「記録する」を押してください。` : "うまく読み取れませんでした。もう一度、まっすぐ撮ってみてください。";
+    } catch (err) { msg.textContent = "読み取れませんでした。通信を確認して、もう一度ためしてください。"; }
+    finally { btn.disabled = false; }
+  });
+
   // ---- 相手チームのヒーロー
   function renderEnemyChips() {
     $("enemies").innerHTML = form.enemies.length ? form.enemies.map((h, i) => `<span class="echip">${heroEmblem(h, HERO_ROLE[h])}${esc(h)}<button type="button" data-ei="${i}" aria-label="${esc(h)}を外す">×</button></span>`).join("") : `<span class="empty">まだ選ばれていません(最大6体)</span>`;
@@ -1496,7 +1580,7 @@ details.more[open] > summary { margin-bottom: 10px; }
       gMatches = null;
       const sentTo = old ? [] : await sendToFriends(doc);
       let notes = [];
-      try { if (old) await applyRankChanges(old.members || [], -1); notes = await applyRankChanges(doc.members, 1); } catch (err) {}
+      try { if (old) await applyRankChanges(old.members || [], -1); notes = await applyRankChanges(doc.members, 1); await new Promise(r => setTimeout(r, 300)); const fx = await fixReadRank(); if (fx) notes = [fx.replace(/にしました$/, "に")]; } catch (err) {}
       lsSet("ow-last-members", JSON.stringify(form.members.map(m => ({ name: m.name, hero: m.hero, role: m.role }))));
       lsSet("ow-last-queue", form.queue);
       $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "") + (sentTo.length ? `。${sentTo.join("・")}さんの記録にも入ります` : "");
