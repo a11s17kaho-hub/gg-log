@@ -3,7 +3,7 @@
 // 設定(Cloudflare の画面で入れる):
 //   GEMINI_KEY      … Google AI Studio で作ったキー(シークレットとして登録)
 //   ALLOWED_ORIGINS … 使ってよいサイト。カンマ区切り(省略時は gglog と owliker)
-//   MODEL           … 省略時は gemini-2.5-flash
+//   MODEL           … 省略時は gemini-3.5-flash-lite
 const PROMPT = `これはゲーム「オーバーウォッチ」のランク戦(ライバル・プレイ)の試合後に出る結果画面を、スマホでモニターごと撮った写真です。
 画面から次の項目を読み取り、JSON だけを返してください。読めない項目は null にして、推測で埋めないでください。
 {
@@ -27,7 +27,7 @@ export default {
     let image = "";
     try { image = (await req.json()).image; } catch (e) {}
     if (typeof image !== "string" || !image || image.length > 2_000_000) return json({ error: "bad image" }, 400);
-    const model = env.MODEL || "gemini-2.5-flash";
+    const model = env.MODEL || "gemini-3.5-flash-lite";
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_KEY },
