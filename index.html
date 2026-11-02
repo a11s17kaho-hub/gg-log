@@ -1338,7 +1338,8 @@ details.more[open] > summary { margin-bottom: 10px; }
 
   // ---- ランク画面の写真から読み取る
   // 写真は縮めてから読み取り用のサーバー(firebase-config.js の OW_READER)へ送り、結果だけを受け取る。写真はどこにも保存しない
-  const READER = window.OW_READER || "";
+  // 設定ファイルが古いまま残っていても使えるよう、URLの既定値を持っておく
+  const READER = window.OW_READER || (window.OW_FIREBASE ? "https://gglog-reader.a11s17kaho.workers.dev" : "");
   let readRank = null;
   async function fixReadRank() {
     const rr = readRank; readRank = null;
