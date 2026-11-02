@@ -1,6 +1,6 @@
 // オフラインでも最後に開いた画面を出すための小さなサービスワーカー。
 // 自分のサイトのファイルだけを扱い、Firebase(ログイン・データ)には触らない。
-const CACHE = "gglog-v3";
+const CACHE = "gglog-v4";
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/", "/manifest.json", "/icons/icon-192.png"]))); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {
