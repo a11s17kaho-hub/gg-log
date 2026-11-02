@@ -7,3 +7,5 @@ window.OW_FIREBASE = {
   messagingSenderId: "690126271670",
   appId: "1:690126271670:web:d85d820b53c8e549aca217",
 };
+// ランク画面の写真を読み取るサーバーのURL(tools/reader-worker.js を Cloudflare Workers に置いたもの)。空のあいだは写真ボタンを出さない
+window.OW_READER = window.OW_READER || "https://gglog-reader.a11s17kaho.workers.dev";
