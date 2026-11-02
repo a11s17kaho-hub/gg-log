@@ -6,7 +6,9 @@
       "firebase.json",
       "firestore.rules",
       "README.md",
-      "tools/**"
+      "tools/**",
+      ".git/**",
+      "**/.git/**"
     ],
     "headers": [
       {
