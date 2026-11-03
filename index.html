@@ -170,6 +170,18 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .ranks { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font-size: 13px; }
 .rolebadge { font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 0 6px; text-align: center; }
 .rolebadge.tank { background: var(--tank); } .rolebadge.damage { background: var(--damage); } .rolebadge.support { background: var(--support); }
+.rolebadge.assault { background: #d2564c; } .rolebadge.skirmisher { background: #d99a2b; } .rolebadge.recon { background: #3d8fd1; } .rolebadge.controller { background: #8a63d2; } .rolebadge.all { background: var(--accent); color: var(--accent-ink, #fff); }
+.roles button[aria-pressed="true"][data-role="assault"] { background: #d2564c; border-color: #d2564c; color: #fff; }
+.roles button[aria-pressed="true"][data-role="skirmisher"] { background: #d99a2b; border-color: #d99a2b; color: #fff; }
+.roles button[aria-pressed="true"][data-role="recon"] { background: #3d8fd1; border-color: #3d8fd1; color: #fff; }
+.roles button[aria-pressed="true"][data-role="controller"] { background: #8a63d2; border-color: #8a63d2; color: #fff; }
+.roles { flex-wrap: wrap; } .roles button { white-space: nowrap; }
+.placeseg { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.placeseg button { font: inherit; font-weight: 700; padding: 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.placeseg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
+.placeseg button[data-p="1"] { grid-column: span 2; }
+.memrow.kd input { width: 5.5em; }
+@media (max-width: 520px) { .placeseg { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .tier { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .tier i { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; flex: none; background: var(--c); }
 .rbadge { flex: none; display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
@@ -527,7 +539,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .rsrow .rolebadge { min-width: 5.5em; text-align: center; }
 .rsrow select { width: auto; min-width: 7em; }
 .rsrow .rsd { min-width: 4em; }
-.rsrow .rsp { width: 5em; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.rsrow .rsp, .rsrow .rsrp, .er .erp, .er .erp, .currank .qrp { width: 5em; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .acctbar.welcome .gbtn { font-size: 16px; padding: 12px 24px 12px 16px; background: #fff; color: #1f1f1f; border-color: #fff; }
 .acctbar.welcome .gbtn svg { width: 24px; height: 24px; }
 .acctbar.welcome .aform input { width: 16em; font-size: 16px; }
@@ -590,7 +602,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       <span class="eyebrow nt">GG LOG · SQUAD STATS</span>
       <h1>GG<span class="nt">ログ</span></h1>
       <p class="sub">みんなで試合結果を記録して、勝率・ランク・ヒーロー・マップの成績をいっしょに見るページ</p>
-      <div class="games" role="group" aria-label="ゲーム"><span class="label">GAME</span><button type="button" class="game on" aria-pressed="true">オーバーウォッチ 2</button><button type="button" class="game" disabled>VALORANT<small>近日</small></button><button type="button" class="game" disabled>Apex Legends<small>近日</small></button><button type="button" class="game" disabled>マーベル・ライバルズ<small>近日</small></button></div>
+      <div class="games" id="gameSeg" role="group" aria-label="ゲーム"><span class="label">GAME</span><button type="button" class="game" data-game="ow2" aria-pressed="false">オーバーウォッチ 2</button><button type="button" class="game" data-game="apex" aria-pressed="false">Apex Legends</button><button type="button" class="game" disabled>VALORANT<small>近日</small></button><button type="button" class="game" disabled>マーベル・ライバルズ<small>近日</small></button></div>
     </div>
     <div class="lang" id="langSeg" role="group" aria-label="Language">
       <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
@@ -647,6 +659,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
             <button type="button" class="big" data-v="draw" aria-pressed="false">DRAW</button>
           </div>
         </div>
+        <div class="field" id="placeField" hidden>
+          <span class="label">順位</span>
+          <div class="placeseg" id="placeSeg"></div>
+        </div>
         <div class="field">
           <span class="label">モード</span>
           <div class="seg2" id="queueSeg"></div>
@@ -664,14 +680,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
             <button type="button" class="ghost" id="memAdd">追加</button>
           </div>
           <div class="known" id="known"></div>
-          <p class="hint">ランク戦では、試合後に出る「+25%」「−20%」などを入れると、そのメンバーの現在ランクが自動で上下します。</p>
+          <p class="hint" id="rankHint">ランク戦では、試合後に出る「+25%」「−20%」などを入れると、そのメンバーの現在ランクが自動で上下します。</p>
         </div>
         <div class="field zone">
           <span class="zlabel">フレンド以外の味方<small>野良でいっしょになった人のヒーロー</small></span>
           <div class="enemies" id="allies"></div>
           <button type="button" class="ghost pickbtn" id="allyPick">＋ 味方のヒーローを選ぶ</button>
         </div>
-        <div class="field">
+        <div class="field" id="enemyField">
           <span class="label">相手チームのヒーロー</span>
           <div class="enemies" id="enemies"></div>
           <button type="button" class="ghost pickbtn" id="enemyPick">＋ 相手のヒーローを選ぶ</button>
@@ -899,21 +915,46 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 
 <script>
 (function () {
-  // ---- ゲームデータ(2026年10月 シーズン5時点。ソンブラはシーズン5でサポートに変更)
-  const HEROES = {
+  // ---- 対応ゲーム。上の GAME で選んだゲームの設定でページ全体を組み立てる(切り替えるとページを読み直す)
+  const GAME_ID = (() => { try { const v = localStorage.getItem("gg-game"); return v === "apex" ? v : "ow2"; } catch (e) { return "ow2"; } })();
+  const APEX_ON = GAME_ID === "apex";
+  // Apex Legends(2026年5月 シーズン29時点。クラスは2024年の再編後)
+  const APEX = {
+    heroes: {
+      assault: ["バリスティック", "バンガロール", "ヒューズ", "マッドマギー", "レヴナント"],
+      skirmisher: ["オルター", "アッシュ", "アクセル", "ホライゾン", "オクタン", "パスファインダー", "レイス"],
+      recon: ["ブラッドハウンド", "クリプト", "シア", "スパロウ", "ヴァルキリー", "ヴァンテージ"],
+      controller: ["カタリスト", "コースティック", "ランパート", "ワットソン"],
+      support: ["コンジット", "ジブラルタル", "ライフライン", "ローバ", "ミラージュ", "ニューキャッスル"],
+    },
+    heroEn: {
+      assault: ["Ballistic", "Bangalore", "Fuse", "Mad Maggie", "Revenant"],
+      skirmisher: ["Alter", "Ash", "Axle", "Horizon", "Octane", "Pathfinder", "Wraith"],
+      recon: ["Bloodhound", "Crypto", "Seer", "Sparrow", "Valkyrie", "Vantage"],
+      controller: ["Catalyst", "Caustic", "Rampart", "Wattson"],
+      support: ["Conduit", "Gibraltar", "Lifeline", "Loba", "Mirage", "Newcastle"],
+    },
+    newHeroes: ["アクセル"],
+    maps: [["バトルロイヤル", ["Kings Canyon", "World's Edge", "Olympus", "Storm Point", "Broken Moon", "E-District"]], ["その他", ["Other"]]],
+  };
+  // ---- オーバーウォッチ 2(2026年10月 シーズン5時点。ソンブラはシーズン5でサポートに変更)
+  const OW_HEROES = {
     tank: ["D.Va", "D.Mon", "ドミナ", "ドゥームフィスト", "ハザード", "ジャンカークイーン", "マウガ", "オリーサ", "ラマットラ", "ラインハルト", "ロードホッグ", "シグマ", "ウィンストン", "レッキング・ボール", "ザリア"],
     damage: ["アンラン", "アッシュ", "バスティオン", "キャスディ", "エコー", "エムレ", "フレイヤ", "ゲンジ", "ハンゾー", "ジャンクラット", "メイ", "ファラ", "リーパー", "シオン", "シエラ", "ソジョーン", "ソルジャー76", "シンメトラ", "トールビョーン", "トレーサー", "ヴェンデッタ", "ベンチャー", "ウィドウメイカー"],
     support: ["アナ", "バティスト", "ブリギッテ", "ドクトリン", "イラリー", "ジェットパック・キャット", "ジュノ", "キリコ", "ライフウィーバー", "ルシオ", "マーシー", "ミズキ", "モイラ", "ソンブラ", "ウーヤン", "ゼニヤッタ"],
   };
-  const NEW_HEROES = new Set(["ドミナ", "エムレ", "ミズキ", "アンラン", "ジェットパック・キャット", "シエラ", "シオン", "D.Mon", "ドクトリン"]);
-  const HERO_EN = {
+  const OW_NEW_HEROES = ["ドミナ", "エムレ", "ミズキ", "アンラン", "ジェットパック・キャット", "シエラ", "シオン", "D.Mon", "ドクトリン"];
+  const OW_HERO_EN = {
     tank: ["D.Va", "D.Mon", "Domina", "Doomfist", "Hazard", "Junker Queen", "Mauga", "Orisa", "Ramattra", "Reinhardt", "Roadhog", "Sigma", "Winston", "Wrecking Ball", "Zarya"],
     damage: ["Anran", "Ashe", "Bastion", "Cassidy", "Echo", "Emre", "Freja", "Genji", "Hanzo", "Junkrat", "Mei", "Pharah", "Reaper", "Shion", "Sierra", "Sojourn", "Soldier: 76", "Symmetra", "Torbjörn", "Tracer", "Vendetta", "Venture", "Widowmaker"],
     support: ["Ana", "Baptiste", "Brigitte", "Doctrine", "Illari", "Jetpack Cat", "Juno", "Kiriko", "Lifeweaver", "Lúcio", "Mercy", "Mizuki", "Moira", "Sombra", "Wuyang", "Zenyatta"],
   };
+  const HEROES = APEX_ON ? APEX.heroes : OW_HEROES;
+  const NEW_HEROES = new Set(APEX_ON ? APEX.newHeroes : OW_NEW_HEROES);
+  const HERO_EN = APEX_ON ? APEX.heroEn : OW_HERO_EN;
   const HERO_ROLE = {};
   Object.entries(HEROES).forEach(([r, hs]) => hs.forEach(h => HERO_ROLE[h] = r));
-  const MAPS = [
+  const OW_MAPS = [
     ["コントロール", ["Antarctic Peninsula", "Busan", "Ilios", "Lijiang Tower", "Nepal", "Oasis", "Samoa"]],
     ["エスコート", ["Circuit Royal", "Dorado", "Havana", "Junkertown", "Rialto", "Route 66", "Shambali Monastery", "Watchpoint: Gibraltar", "Watchpoint: Grímsvötn"]],
     ["ハイブリッド", ["Blizzard World", "Eichenwalde", "Hollywood", "King's Row", "Midtown", "Neon Junction", "Numbani", "Paraíso"]],
@@ -923,6 +964,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["スタジアム", ["Arena Victoriae", "Busan Sanctuary", "Gogadoro", "Ilios Ruins", "Lijiang Tower Night Market", "Nepal Shrine", "Oasis Gardens", "Oasis University", "Samoa Volcano", "Wuxing University", "Place Lacroix", "Redwood Dam", "Serenza", "Powder Keg Mine", "Thames District"]],
     ["その他", ["Other"]],
   ];
+  const MAPS = APEX_ON ? APEX.maps : OW_MAPS;
   const MAP_TYPE = {};
   MAPS.forEach(([t, ms]) => ms.forEach(m => MAP_TYPE[m] = t));
   // カスタムゲームの1v1で選べるマップ(エリミネーション/デスマッチ用のアリーナと、ワークショップ用の空間)
@@ -951,6 +993,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     "フラッシュポイント": '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
     "クラッシュ": '<path d="M4 4l16 16"/><path d="M20 4L4 20"/><path d="M4 9V4h5"/><path d="M20 15v5h-5"/>',
     "その他": '<circle cx="12" cy="12" r="3" fill="currentColor"/>',
+    "バトルロイヤル": '<path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><path d="M9 12l2 2 4-4"/>',
     "ワークショップ「1v1 Arena」": '<path d="M14 6l4 4-8 8H6v-4z"/><path d="M13 7l4 4"/>',
     "ミステリー・リミテッドデュエル": '<path d="M9 9a3 3 0 1 1 4 2.8c-.8.4-1 1-1 1.7V15"/><circle cx="12" cy="18.5" r=".6" fill="currentColor"/><circle cx="12" cy="12" r="10"/>',
     "エリミネーション": '<circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
@@ -962,19 +1005,23 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const hashStr = s => { let h = 2166136261; for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
   const seeded = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   let artId = 0;
-  const ROLE_HUE = { tank: 222, damage: 342, support: 152, other: 220 };
+  const ROLE_HUE = { tank: 222, damage: 342, support: 152, other: 220, assault: 4, skirmisher: 38, recon: 205, controller: 268 };
   const ROLE_GLYPH = {
     tank: '<path d="M32 13l15 6v11c0 10-7 17-15 21-8-4-15-11-15-21V19z"/>',
     damage: '<path d="M32 12v12M32 40v12M12 32h12M40 32h12"/><circle cx="32" cy="32" r="10"/>',
     support: '<path d="M27 16h10v11h11v10H37v11H27V37H16V27h11z"/>',
     other: '<circle cx="32" cy="32" r="12"/>',
+    assault: '<path d="M18 40l14-22 14 22"/><path d="M24 46h16"/>',
+    skirmisher: '<path d="M14 40l12-8-4 12 20-24-12 8 4-12z"/>',
+    recon: '<circle cx="32" cy="32" r="12"/><circle cx="32" cy="32" r="4" fill="#fff"/><path d="M32 12v6M32 46v6M12 32h6M46 32h6"/>',
+    controller: '<rect x="18" y="18" width="28" height="28" rx="4"/><path d="M18 32h28M32 18v28"/>',
   };
   // ---- オリジナル絵(heroes/*.jpg, maps/*.jpg)があればそれを使い、なければコードで描いた絵
   const fileKey = (s, sep) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, sep).replace(/^_|_$/g, "");
   const HERO_KEY = {};
   Object.keys(HEROES).forEach(r => HEROES[r].forEach((h, i) => HERO_KEY[h] = fileKey(HERO_EN[r][i], "")));
-  const OFFICIAL_HEROES = new Set(["Ana", "Anran", "Ashe", "Baptiste", "Bastion", "Brigitte", "Cassidy", "DMon", "DVa", "Doctrine", "Domina", "Doomfist", "Echo", "Emre", "Freja", "Genji", "Hanzo", "Hazard", "Illari", "JetpackCat", "JunkerQueen", "Junkrat", "Juno", "Kiriko", "Lifeweaver", "Lucio", "Mauga", "Mei", "Mercy", "Mizuki", "Moira", "Orisa", "Pharah", "Ramattra", "Reaper", "Reinhardt", "Roadhog", "Shion", "Sierra", "Sigma", "Sojourn", "Soldier76", "Sombra", "Symmetra", "Torbjorn", "Tracer", "Vendetta", "Venture", "Widowmaker", "Winston", "WreckingBall", "Wuyang", "Zarya", "Zenyatta"]);
-  const OFFICIAL_MAPS = new Set(["Arena_Victoriae", "Gogadoro", "Wuxing_University", "Place_Lacroix", "Redwood_Dam", "Serenza", "Powder_Keg_Mine", "Thames_District", "Aatlis", "Antarctic_Peninsula", "Blizzard_World", "Busan", "Circuit_Royal", "Colosseo", "Dorado", "Eichenwalde", "Esperanca", "Hanaoka", "Havana", "Hollywood", "Ilios", "Junkertown", "King_s_Row", "Lijiang_Tower", "Midtown", "Neon_Junction", "Nepal", "New_Junk_City", "New_Queen_Street", "Numbani", "Oasis", "Paraiso", "Rialto", "Route_66", "Runasapi", "Samoa", "Shambali_Monastery", "Suravasa", "Throne_of_Anubis", "Watchpoint_Gibraltar", "Watchpoint_Grimsvotn", "Busan_Sanctuary", "Ilios_Ruins", "Lijiang_Tower_Night_Market", "Nepal_Shrine", "Oasis_Gardens", "Oasis_University", "Samoa_Volcano"]);
+  const OFFICIAL_HEROES = APEX_ON ? new Set() : new Set(["Ana", "Anran", "Ashe", "Baptiste", "Bastion", "Brigitte", "Cassidy", "DMon", "DVa", "Doctrine", "Domina", "Doomfist", "Echo", "Emre", "Freja", "Genji", "Hanzo", "Hazard", "Illari", "JetpackCat", "JunkerQueen", "Junkrat", "Juno", "Kiriko", "Lifeweaver", "Lucio", "Mauga", "Mei", "Mercy", "Mizuki", "Moira", "Orisa", "Pharah", "Ramattra", "Reaper", "Reinhardt", "Roadhog", "Shion", "Sierra", "Sigma", "Sojourn", "Soldier76", "Sombra", "Symmetra", "Torbjorn", "Tracer", "Vendetta", "Venture", "Widowmaker", "Winston", "WreckingBall", "Wuyang", "Zarya", "Zenyatta"]);
+  const OFFICIAL_MAPS = APEX_ON ? new Set() : new Set(["Arena_Victoriae", "Gogadoro", "Wuxing_University", "Place_Lacroix", "Redwood_Dam", "Serenza", "Powder_Keg_Mine", "Thames_District", "Aatlis", "Antarctic_Peninsula", "Blizzard_World", "Busan", "Circuit_Royal", "Colosseo", "Dorado", "Eichenwalde", "Esperanca", "Hanaoka", "Havana", "Hollywood", "Ilios", "Junkertown", "King_s_Row", "Lijiang_Tower", "Midtown", "Neon_Junction", "Nepal", "New_Junk_City", "New_Queen_Street", "Numbani", "Oasis", "Paraiso", "Rialto", "Route_66", "Runasapi", "Samoa", "Shambali_Monastery", "Suravasa", "Throne_of_Anubis", "Watchpoint_Gibraltar", "Watchpoint_Grimsvotn", "Busan_Sanctuary", "Ilios_Ruins", "Lijiang_Tower_Night_Market", "Nepal_Shrine", "Oasis_Gardens", "Oasis_University", "Samoa_Volcano"]);
   function heroImg(name, role) {
     const k = HERO_KEY[name];
     if (!k || !OFFICIAL_HEROES.has(k)) return "";
@@ -1095,16 +1142,21 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const ctx = { id: "ma" + (++artId), r: seeded(hashStr(name)) };
     return `<svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs></defs>${layers.map(f => f(ctx)).join("")}</svg>`;
   }
-  const QUEUES = ["クイック", "ランク", "スタジアム", "アーケード", "カスタム"];
-  const ROLES = [["tank", "タンク"], ["damage", "ダメージ"], ["support", "サポート"]];
+  const QUEUES = APEX_ON ? ["カジュアル", "ランク", "ミックステープ", "イベント", "カスタム"] : ["クイック", "ランク", "スタジアム", "アーケード", "カスタム"];
+  const ROLES = APEX_ON ? [["assault", "アサルト"], ["skirmisher", "スカーミッシャー"], ["recon", "リコン"], ["controller", "コントローラー"], ["support", "サポート"]] : [["tank", "タンク"], ["damage", "ダメージ"], ["support", "サポート"]];
+  // ランクを持つ単位。OWはロールごと、Apexはアカウントで1つ
+  const RANK_ROLES = APEX_ON ? [["all", "ランク"]] : ROLES;
+  const rk = x => APEX_ON ? "all" : x.role;
+  const rankRoleJa = k => (RANK_ROLES.find(r => r[0] === k) || [k, ""])[1];
   const ROLE_JA = Object.fromEntries(ROLES);
-  const TIERS = [["ブロンズ", "#a2693c"], ["シルバー", "#9aa4b1"], ["ゴールド", "#d4a420"], ["プラチナ", "#4fa3a5"], ["ダイヤモンド", "#5a8ee6"], ["マスター", "#8fb4c9"], ["グランドマスター", "#9b6be0"], ["チャンピオン", "#e0655a"], ["エメラルド", "#19c37d"]];
+  const TIERS = APEX_ON ? [["ルーキー", "#8c7b6b"], ["ブロンズ", "#a2693c"], ["シルバー", "#9aa4b1"], ["ゴールド", "#d4a420"], ["プラチナ", "#4fa3a5"], ["ダイヤモンド", "#5a8ee6"], ["マスター", "#9b6be0"], ["プレデター", "#e0655a"]] : [["ブロンズ", "#a2693c"], ["シルバー", "#9aa4b1"], ["ゴールド", "#d4a420"], ["プラチナ", "#4fa3a5"], ["ダイヤモンド", "#5a8ee6"], ["マスター", "#8fb4c9"], ["グランドマスター", "#9b6be0"], ["チャンピオン", "#e0655a"], ["エメラルド", "#19c37d"]];
   // 並び順(エメラルドは後から追加したので、保存済みの番号を変えないよう末尾に置き、表示順だけプラチナの次にする)
-  const TIER_ORDER = [0, 1, 2, 3, 8, 4, 5, 6, 7];
+  const TIER_ORDER = APEX_ON ? [0, 1, 2, 3, 4, 5, 6, 7] : [0, 1, 2, 3, 8, 4, 5, 6, 7];
   const tpos = t => TIER_ORDER.indexOf(t);
   const PLATFORMS = [["pc", "PC"], ["ps", "PlayStation"], ["xbox", "Xbox"], ["switch", "Switch"]];
   const PLAT_LABEL = Object.fromEntries(PLATFORMS);
   const RES_LABEL = { win: "WIN", loss: "LOSE", draw: "DRAW" };
+  const resLabel = m => APEX_ON && m.place ? (m.place === 1 ? "CHAMPION" : "#" + m.place) : RES_LABEL[m.result] || "?";
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1120,20 +1172,52 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const pid = name => "p_" + [...new TextEncoder().encode(name)].map(b => b.toString(16).padStart(2, "0")).join("");
-  const sgn = n => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n) + "%";
+  // ランク変動の単位。OWは%、ApexはRP
+  const UNIT = APEX_ON ? "RP" : "%";
+  const sgn = n => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n) + UNIT;
+  const MAX_MEM = APEX_ON ? 3 : 6;
+  const LK = k => APEX_ON ? k + "-apex" : k;
 
   // ランク: ティア×5ディビジョン×100% を1本の数値にして上下させる
   const MAX_TOTAL = TIERS.length * 500 - 1;
-  const rankTotal = r => (tpos(r.tier) * 5 + (5 - r.div)) * 100 + (r.pct || 0);
-  const fromTotal = t => { t = Math.max(0, Math.min(MAX_TOTAL, Math.round(t))); const tier = TIER_ORDER[Math.floor(t / 500)], rem = t % 500; return { tier, div: 5 - Math.floor(rem / 100), pct: rem % 100 }; };
-  const validRank = r => r && Number.isInteger(r.tier) && r.tier >= 0 && r.tier < TIERS.length && r.div >= 1 && r.div <= 5;
-  const rankLabel = r => `${TIERS[r.tier][0]} ${r.div}`;
+  const owTotal = r => (tpos(r.tier) * 5 + (5 - r.div)) * 100 + (r.pct || 0);
+  const owFrom = t => { t = Math.max(0, Math.min(MAX_TOTAL, Math.round(t))); const tier = TIER_ORDER[Math.floor(t / 500)], rem = t % 500; return { tier, div: 5 - Math.floor(rem / 100), pct: rem % 100 }; };
+  const owValid = r => r && Number.isInteger(r.tier) && r.tier >= 0 && r.tier < TIERS.length && r.div >= 1 && r.div <= 5;
+  // Apex: RPからティアとディビジョン(4が下、1が上)を出す。マスター以上はディビジョンなし
+  const APEX_STEPS = [[0, 250], [1000, 500], [3000, 600], [5400, 700], [8200, 800], [11400, 900]];
+  const apexFrom = rp => {
+    rp = Math.max(0, Math.min(99999, Math.round(+rp || 0)));
+    if (rp >= 15000) return { rp, tier: 6, div: 0 };
+    for (let t = APEX_STEPS.length - 1; t >= 0; t--) { const [st, w] = APEX_STEPS[t]; if (rp >= st) return { rp, tier: t, div: 4 - Math.min(3, Math.floor((rp - st) / w)) }; }
+    return { rp, tier: 0, div: 4 };
+  };
+  const tierOpts = (sel, empty) => (empty ? `<option value="">未設定</option>` : "") + TIER_ORDER.map(k => `<option value="${k}" ${sel === k ? "selected" : ""}>${TIERS[k][0]}</option>`).join("");
+  // ゲームごとのランクの扱い。inputs/read は入力欄(クラス名の頭に c を付ける)を作る・読む
+  const RANK = APEX_ON ? {
+    valid: r => !!r && Number.isFinite(r.rp),
+    total: r => r.rp,
+    from: t => apexFrom(t),
+    label: r => `${TIERS[r.tier][0]}${r.div ? " " + r.div : ""}`,
+    prog: r => [`${r.rp}RP`, r.tier >= 6 ? 100 : (() => { const [st, w] = APEX_STEPS[r.tier]; return ((r.rp - st) % w) / w * 100; })()],
+    inputs: (c, r, ja) => `<input type="text" inputmode="numeric" class="${c}rp" maxlength="5" placeholder="未設定" value="${r && Number.isFinite(r.rp) ? r.rp : ""}" aria-label="${ja}のRP"><span class="label">RP</span>`,
+    read: (box, c) => { const v = (box.querySelector("." + c + "rp").value || "").replace(/[^0-9]/g, ""); return v === "" ? null : apexFrom(+v); },
+    hint: "いまのRP(ランクポイント)を入れてください。ティアとディビジョンは自動で決まります。",
+  } : {
+    valid: owValid, total: owTotal, from: owFrom,
+    label: r => `${TIERS[r.tier][0]} ${r.div}`,
+    prog: r => [`${r.pct || 0}%`, r.pct || 0],
+    inputs: (c, r, ja, empty) => { const v = owValid(r);
+      return `<select class="${c}t" aria-label="${ja}のティア">${tierOpts(v ? r.tier : empty ? "" : 2, empty)}</select><select class="${c}d" aria-label="${ja}のディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}" ${v && r.div === d ? "selected" : ""}>${d}</option>`).join("")}</select><input type="text" inputmode="numeric" class="${c}p" maxlength="2" placeholder="%" value="${v ? (r.pct || 0) : ""}" aria-label="${ja}の進行度%">`; },
+    read: (box, c) => { const tv = box.querySelector("." + c + "t").value; if (tv === "") return null; return { tier: +tv, div: +box.querySelector("." + c + "d").value, pct: Math.max(0, Math.min(99, parseInt(box.querySelector("." + c + "p").value, 10) || 0)) }; },
+    hint: "ディビジョンは5が一番下、1が一番上です。右の欄は次のディビジョンまでの進み具合(0〜99%)です。",
+  };
+  const validRank = r => RANK.valid(r), rankTotal = r => RANK.total(r), fromTotal = t => RANK.from(t), rankLabel = r => RANK.label(r);
   // ランクのバッジ(コードで描く盾形。ティアの色、マスター以上は翼、真ん中にディビジョン1〜5)
   const rankBadge = (r, s = 30) => {
     const c = TIERS[r.tier][1], hi = tpos(r.tier) >= 6;
     const wings = hi ? `<path d="M5 14 L0 10 L1 20 L5 24 Z M35 14 L40 10 L39 20 L35 24 Z" fill="${c}" opacity=".85"/>` : "";
     const crown = tpos(r.tier) >= 7 ? `<path d="M13 4 L16 8 L20 3 L24 8 L27 4 L26 10 H14 Z" fill="#ffd36b"/>` : "";
-    return `<svg class="rbadge" width="${s}" height="${s}" viewBox="0 0 40 40" aria-hidden="true">${wings}<path d="M20 6 L34 12 V22 C34 30 28 35 20 38 C12 35 6 30 6 22 V12 Z" fill="${c}" stroke="rgba(255,255,255,.6)" stroke-width="1.5"/><path d="M20 10 L30 14.5 V22 C30 28 26 31.5 20 34 C14 31.5 10 28 10 22 V14.5 Z" fill="rgba(0,0,0,.3)"/>${crown}<text x="20" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" font-family="Barlow Condensed, Inter, sans-serif">${r.div}</text></svg>`;
+    return `<svg class="rbadge" width="${s}" height="${s}" viewBox="0 0 40 40" aria-hidden="true">${wings}<path d="M20 6 L34 12 V22 C34 30 28 35 20 38 C12 35 6 30 6 22 V12 Z" fill="${c}" stroke="rgba(255,255,255,.6)" stroke-width="1.5"/><path d="M20 10 L30 14.5 V22 C30 28 26 31.5 20 34 C14 31.5 10 28 10 22 V14.5 Z" fill="rgba(0,0,0,.3)"/>${crown}<text x="20" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#fff" font-family="Barlow Condensed, Inter, sans-serif">${r.div || ""}</text></svg>`;
   };
 
   // ---- サンプル(共有データが空のときだけ表示。保存はしない)
@@ -1164,8 +1248,35 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     }
     return out;
   }
-  const SAMPLE = makeSample();
-  const SAMPLE_PLAYERS = {
+  function makeApexSample() {
+    const ppl = [{ name: "プレイヤーA", pool: ["レイス", "オクタン", "ホライゾン"] }, { name: "プレイヤーB", pool: ["ブラッドハウンド", "ヴァルキリー", "シア"] }, { name: "プレイヤーC", pool: ["ライフライン", "ジブラルタル", "ニューキャッスル"] }];
+    const maps = APEX.maps[0][1];
+    let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const out = []; const base = new Date(); base.setDate(base.getDate() - 13);
+    for (let d = 0; d < 14; d += 1 + Math.floor(rnd() * 2)) {
+      const day = new Date(base); day.setDate(base.getDate() + d);
+      const n = 2 + Math.floor(rnd() * 4);
+      for (let i = 0; i < n; i++) {
+        const place = rnd() < .12 ? 1 : 1 + Math.floor(rnd() * rnd() * 20);
+        const queue = rnd() < .7 ? "ランク" : "カジュアル";
+        const k = 2 + Math.floor(rnd() * 2);
+        const members = ppl.slice(0, k).map(p => {
+          const hero = p.pool[Math.floor(rnd() * p.pool.length)];
+          const kills = Math.floor(rnd() * (place <= 3 ? 7 : 4));
+          const delta = queue !== "ランク" ? null : (place <= 10 ? 1 : -1) * (place <= 3 ? 60 + Math.floor(rnd() * 80) : 10 + Math.floor(rnd() * 30));
+          return { name: p.name, hero, role: HERO_ROLE[hero], delta, kills, dmg: kills * 180 + Math.floor(rnd() * 400) };
+        });
+        out.push({ id: "s" + d + "-" + i, result: place === 1 ? "win" : "loss", place, map: maps[Math.floor(rnd() * maps.length)], queue, date: isoDay(day), members, allies: [], enemies: [], note: "", createdAt: day.getTime() - day.getHours() * 3600000 + (14 + i * 2) * 3600000 });
+      }
+    }
+    return out;
+  }
+  const SAMPLE = APEX_ON ? makeApexSample() : makeSample();
+  const SAMPLE_PLAYERS = APEX_ON ? {
+    "プレイヤーA": { name: "プレイヤーA", platform: "pc", ranks: { all: apexFrom(9120) } },
+    "プレイヤーB": { name: "プレイヤーB", platform: "ps", ranks: { all: apexFrom(6050) } },
+    "プレイヤーC": { name: "プレイヤーC", platform: "pc", ranks: { all: apexFrom(12480) } },
+  } : {
     "プレイヤーA": { name: "プレイヤーA", platform: "pc", ranks: { tank: { tier: 3, div: 2, pct: 40 } } },
     "プレイヤーB": { name: "プレイヤーB", platform: "ps", ranks: { damage: { tier: 4, div: 5, pct: 15 }, support: { tier: 2, div: 1, pct: 70 } } },
     "プレイヤーC": { name: "プレイヤーC", platform: "switch", ranks: { support: { tier: 3, div: 4, pct: 85 } } },
@@ -1177,7 +1288,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   let auth = null, authUser = null, me = null, nameEditing = false;
   let matches = [], players = {}, playersReady = false;
   let isSample = true, shown = 15, editing = null, pendingDel = null, pendingPDel = null, editingMatch = null;
-  const form = { result: null, queue: "ランク", members: [], enemies: [], allies: [] };
+  const form = { result: null, place: null, queue: "ランク", members: [], enemies: [], allies: [] };
 
   // ---- フォーム
   $("heroList").innerHTML = ROLES.map(([r]) => HEROES[r].map(h => `<option value="${esc(h)}">${ROLE_JA[r]}</option>`).join("")).join("");
@@ -1185,8 +1296,24 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("queueSeg").innerHTML = QUEUES.map(q => `<button type="button" data-v="${q}" aria-pressed="false">${q}</button>`).join("");
   $("fQueue").innerHTML = `<option value="">すべて</option>` + QUEUES.map(q => `<option>${q}</option>`).join("");
   showToday();
-  try { const saved = JSON.parse(lsGet("ow-last-members") || "null"); if (Array.isArray(saved)) form.members = saved.filter(m => m && typeof m.name === "string").slice(0, 6).map(m => ({ name: m.name, hero: m.hero || "", role: m.role || "", dir: 1, amt: "" })); } catch (e) {}
-  { const q = lsGet("ow-last-queue"); if (QUEUES.includes(q)) form.queue = q; }
+  try { const saved = JSON.parse(lsGet(LK("ow-last-members")) || "null"); if (Array.isArray(saved)) form.members = saved.filter(m => m && typeof m.name === "string").slice(0, MAX_MEM).map(m => ({ name: m.name, hero: HERO_ROLE[m.hero] ? m.hero : "", role: ROLES.some(r => r[0] === m.role) ? m.role : "", dir: 1, amt: "" })); } catch (e) {}
+  { const q = lsGet(LK("ow-last-queue")); if (QUEUES.includes(q)) form.queue = q; }
+  // ゲームの切り替え(選んだゲームを覚えてページを読み直す)
+  $("gameSeg").querySelectorAll("[data-game]").forEach(b => { const on = b.dataset.game === GAME_ID; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  $("gameSeg").addEventListener("click", e => { const b = e.target.closest("[data-game]"); if (!b || b.dataset.game === GAME_ID) return; lsSet("gg-game", b.dataset.game); location.reload(); });
+  // Apex: 勝ち負けの代わりに順位。1位=チャンピオンを「勝ち」として集計する
+  if (APEX_ON) {
+    $("resultSeg").closest(".field").hidden = true;
+    $("placeField").hidden = false;
+    $("placeSeg").innerHTML = Array.from({ length: 20 }, (_, i) => `<button type="button" data-p="${i + 1}" aria-pressed="false">${i === 0 ? "1位" : i + 1}</button>`).join("");
+    $("enemyField").hidden = true;
+    $("rankHint").textContent = "ランク戦では、試合後に出るRPの増減(「+45」「−20」など)を入れると、そのメンバーの現在ランクが自動で上下します。";
+  }
+  function setPlace(p) {
+    form.place = p; form.result = p ? (p === 1 ? "win" : "loss") : null;
+    $("placeSeg").querySelectorAll("[data-p]").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.p === p)));
+  }
+  $("placeSeg").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (!b) return; setPlace(+b.dataset.p); renderMembers(); updateSubmit(); });
 
   function setPressed(container, v) { container.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
   function syncQueue() { setPressed($("queueSeg"), form.queue); $("form").classList.toggle("ranked", form.queue === "ランク"); }
@@ -1208,7 +1335,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   }
   function addMember(name) {
     name = String(name || "").trim().slice(0, 24);
-    if (!name || form.members.some(m => m.name === name) || form.members.length >= 6) return;
+    if (!name || form.members.some(m => m.name === name) || form.members.length >= MAX_MEM) return;
     // 前回使ったヒーローを引き継ぐ
     let hero = "", role = "";
     for (const m of [...matches].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))) { const x = (m.members || []).find(x => x.name === name); if (x) { hero = x.hero || ""; role = x.role || ""; break; } }
@@ -1228,22 +1355,23 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
           <span class="label">ランク</span>
           <button type="button" data-dir="1" aria-pressed="${m.dir === 1}">▲上がった</button>
           <button type="button" data-dir="-1" aria-pressed="${m.dir === -1}">▼下がった</button>
-          <input type="text" inputmode="numeric" id="amt-${i}" class="amt" placeholder="0" value="${esc(m.amt)}" maxlength="3" aria-label="${esc(m.name)}の変動%"><span class="label">%</span>
+          <input type="text" inputmode="numeric" id="amt-${i}" class="amt" placeholder="0" value="${esc(m.amt)}" maxlength="3" aria-label="${esc(m.name)}の変動${UNIT}"><span class="label">${UNIT}</span>
         </div>
-        <div class="memrow delta quick">${[10, 15, 20, 25, 30].map(v => `<button type="button" data-amt="${v}" aria-pressed="${String(m.amt) === String(v)}">${v}%</button>`).join("")}</div>
+        <div class="memrow delta quick">${(APEX_ON ? [10, 25, 50, 75, 100] : [10, 15, 20, 25, 30]).map(v => `<button type="button" data-amt="${v}" aria-pressed="${String(m.amt) === String(v)}">${v}${UNIT}</button>`).join("")}</div>
+        ${APEX_ON ? `<div class="memrow kd"><span class="label">キル</span><input type="text" inputmode="numeric" class="kills" maxlength="2" placeholder="0" value="${esc(m.kills ?? "")}" aria-label="${esc(m.name)}のキル数"><span class="label">ダメージ</span><input type="text" inputmode="numeric" class="dmg" maxlength="5" placeholder="0" value="${esc(m.dmg ?? "")}" aria-label="${esc(m.name)}のダメージ"></div>` : ""}
         <div class="memrow currank">${curRank(m, i)}</div>
-      </div>`).join("") : `<div class="empty">まだ誰もいません。下で名前を追加してください(最大6人)。</div>`;
+      </div>`).join("") : `<div class="empty">まだ誰もいません。下で名前を追加してください(最大${MAX_MEM}人)。</div>`;
     renderKnown();
   }
   // 記録フォームで、そのメンバーのいまのランクを見せる。未設定ならその場で設定できる
   function curRank(m, i) {
-    // ロールごとのランクを3つ並べ、選んだロールを強調。選んだロールが未設定ならその場で設定
-    const p = players[m.name], ranks = (p && p.ranks) || {};
-    const all = `<span class="rk3">${ROLES.map(([k, ja]) => { const r = ranks[k];
-      return `<span class="rk ${m.role === k ? "on" : ""}"><span class="rolebadge ${k}">${ja}</span>${validRank(r) ? `${rankBadge(r, 24)}<b>${rankLabel(r)}</b>` : `<small>未設定</small>`}</span>`; }).join("")}</span>`;
-    const r = m.role && ranks[m.role];
-    if (!m.role || validRank(r) || !canWrite || !pcol) return all;
-    return all + `<span class="label">${ROLE_JA[m.role]}のランク</span><select class="qt" aria-label="ティア">${TIER_ORDER.map(k => `<option value="${k}" ${k === 2 ? "selected" : ""}>${TIERS[k][0]}</option>`).join("")}</select><select class="qd" aria-label="ディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><button type="button" class="ghost primaryish" data-qsave="${i}">決定</button>`;
+    // ランクを並べ、選んだロールを強調。そのランクが未設定ならその場で設定(Apexはアカウントで1つ)
+    const p = players[m.name], ranks = (p && p.ranks) || {}, key = rk(m);
+    const all = `<span class="rk3">${RANK_ROLES.map(([k, ja]) => { const r = ranks[k];
+      return `<span class="rk ${key === k ? "on" : ""}"><span class="rolebadge ${k}">${ja}</span>${validRank(r) ? `${rankBadge(r, 24)}<b>${rankLabel(r)}</b>` : `<small>未設定</small>`}</span>`; }).join("")}</span>`;
+    const r = key && ranks[key];
+    if (!key || validRank(r) || !canWrite || !pcol) return all;
+    return all + `<span class="label">${rankRoleJa(key)}のランク</span>${RANK.inputs("q", null, rankRoleJa(key), false)}<button type="button" class="ghost primaryish" data-qsave="${i}">決定</button>`;
   }
   function renderKnown() {
     // 候補はサンプルではなく本物の記録から出す
@@ -1257,9 +1385,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   $("members").addEventListener("click", async e => {
     const qs = e.target.closest("[data-qsave]");
     if (qs) {
-      const m = form.members[+qs.dataset.qsave], box = qs.closest(".mem"); if (!m || !m.role || !pcol) return;
+      const m = form.members[+qs.dataset.qsave], box = qs.closest(".mem"), key = m && rk(m); if (!key || !pcol) return;
       const p = players[m.name] || { ranks: {}, platform: "" };
-      const ranks = { ...p.ranks, [m.role]: { tier: +box.querySelector(".qt").value, div: +box.querySelector(".qd").value, pct: 0 } };
+      const nr = RANK.read(box, "q"); if (!nr) return;
+      const ranks = { ...p.ranks, [key]: nr };
       try { await pcol.doc(pid(m.name)).set({ name: m.name, ranks, platform: p.platform || "", updatedAt: Date.now() }); players[m.name] = { name: m.name, ranks, platform: p.platform || "" }; renderMembers(); }
       catch (err) { $("toast").textContent = "ランクを保存できませんでした"; }
       return;
@@ -1274,11 +1403,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const qa = e.target.closest("[data-amt]");
     if (qa) { m.amt = qa.dataset.amt; renderMembers(); return; }
     const pk = e.target.closest("[data-pick]");
-    if (pk) openPicker({ kind: "ally", i: +pk.dataset.pick });
+    if (pk) openPicker({ kind: "member", i: +pk.dataset.pick });
   });
   $("members").addEventListener("input", e => {
     const row = e.target.closest(".mem"); if (!row) return; const m = form.members[+row.dataset.i];
     if (e.target.classList.contains("amt")) { e.target.value = e.target.value.replace(/[^0-9]/g, ""); m.amt = e.target.value; }
+    if (e.target.classList.contains("kills")) { e.target.value = e.target.value.replace(/[^0-9]/g, ""); m.kills = e.target.value; }
+    if (e.target.classList.contains("dmg")) { e.target.value = e.target.value.replace(/[^0-9]/g, ""); m.dmg = e.target.value; }
   });
   $("known").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b) addMember(b.dataset.k); });
   $("memAdd").addEventListener("click", () => { addMember($("memName").value); $("memName").value = ""; $("memName").focus(); });
@@ -1290,13 +1421,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     // 試合のランク変動を各メンバーの現在ランクに反映(削除時は sign = -1 で戻す)
     const notes = [];
     for (const x of members) {
-      if (!x.delta || !x.role) continue;
-      const p = players[x.name]; const r = p && p.ranks && p.ranks[x.role];
+      const k = rk(x);
+      if (!x.delta || !k) continue;
+      const p = players[x.name]; const r = p && p.ranks && p.ranks[k];
       if (!validRank(r)) continue;
       const next = fromTotal(rankTotal(r) + sign * x.delta);
-      const ranks = { ...p.ranks, [x.role]: next };
+      const ranks = { ...p.ranks, [k]: next };
       await pcol.doc(pid(x.name)).set({ name: x.name, ranks, platform: p.platform || "", updatedAt: Date.now() });
-      if (next.tier !== r.tier || next.div !== r.div) notes.push(`${x.name}の${ROLE_JA[x.role]}が${rankLabel(next)}に`);
+      if (next.tier !== r.tier || next.div !== r.div) notes.push(APEX_ON ? `${x.name}が${rankLabel(next)}に` : `${x.name}の${ROLE_JA[x.role]}が${rankLabel(next)}に`);
     }
     return notes;
   }
@@ -1315,7 +1447,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   renderEnemyChips();
   // 味方(フレンド以外の野良)は 5人 - 登録メンバー数 まで
   // ロールごとの枠(6v6 に合わせて各2体)。枠がいっぱいのロールを選ぶと、そのロールで最後に選んだヒーローと入れ替える
-  const ROLE_CAP = { tank: 2, damage: 2, support: 2 };
+  const ROLE_CAP = APEX_ON ? {} : { tank: 2, damage: 2, support: 2 };
   function pickWithCap(list, h, fixedRoles, max) {
     const j = list.indexOf(h);
     if (j >= 0) { list.splice(j, 1); return; }
@@ -1328,7 +1460,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     if (list.length < max) list.push(h);
   }
   // フレンド以外の味方は最大6人まで選べる
-  function allyMax() { return 6; }
+  function allyMax() { return APEX_ON ? Math.max(0, 3 - form.members.length) : 6; }
   function renderAllyChips() {
     if (form.allies.length > allyMax()) form.allies.length = allyMax();
     $("allies").innerHTML = form.allies.length ? form.allies.map((h, i) => `<span class="echip">${heroEmblem(h, HERO_ROLE[h])}${esc(h)}<button type="button" data-ai="${i}" aria-label="${esc(h)}を外す">×</button></span>`).join("") : `<span class="empty">まだ選ばれていません(最大${allyMax()}体)</span>`;
@@ -1395,10 +1527,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   function setMap(m) {
     $("map").value = m;
     $("mapBtn").innerHTML = `<span class="art">${mapArt(m)}</span><span class="mnm">${esc(m)}<small>変更</small></span>`;
-    lsSet("ow-last-map", m);
+    lsSet(LK("ow-last-map"), m);
   }
   $("mapBtn").addEventListener("click", () => openPicker({ kind: "map" }));
-  { const lm = lsGet("ow-last-map"); setMap(MAP_TYPE[lm] ? lm : "Busan"); }
+  { const lm = lsGet(LK("ow-last-map")); setMap(MAP_TYPE[lm] ? lm : MAPS[0][1][0]); }
 
   $("form").addEventListener("submit", async e => {
     e.preventDefault();
@@ -1408,9 +1540,12 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       result: form.result, map: $("map").value, queue: form.queue, date: today(),
       members: form.members.map(m => {
         const amt = parseInt(m.amt, 10);
-        return { name: m.name, hero: (m.hero || "").slice(0, 24), role: m.role || HERO_ROLE[m.hero] || "", delta: ranked && amt > 0 ? m.dir * Math.min(amt, 100) : null };
+        const x = { name: m.name, hero: (m.hero || "").slice(0, 24), role: m.role || HERO_ROLE[m.hero] || "", delta: ranked && amt > 0 ? m.dir * Math.min(amt, APEX_ON ? 999 : 100) : null };
+        if (APEX_ON) { const k = parseInt(m.kills, 10), d = parseInt(m.dmg, 10); if (k >= 0) x.kills = Math.min(k, 99); if (d >= 0) x.dmg = Math.min(d, 99999); }
+        return x;
       }),
-      enemies: form.enemies.slice(0, 6),
+      ...(APEX_ON && form.place ? { place: form.place } : {}),
+      enemies: APEX_ON ? [] : form.enemies.slice(0, 6),
       allies: form.allies.slice(0, allyMax()),
       ...(authUser && myName() ? { uids: [authUser.uid] } : {}),
       note: $("note").value.trim().slice(0, 80), createdAt: Date.now(), by: myName() || "",
@@ -1430,12 +1565,12 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       gMatches = null;
       let notes = [];
       try { if (old) await applyRankChanges(old.members || [], -1); notes = await applyRankChanges(doc.members, 1); } catch (err) {}
-      lsSet("ow-last-members", JSON.stringify(form.members.map(m => ({ name: m.name, hero: m.hero, role: m.role }))));
-      lsSet("ow-last-queue", form.queue);
-      $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${RES_LABEL[doc.result]}` + (notes.length ? `。${notes.join("、")}なりました` : "");
+      lsSet(LK("ow-last-members"), JSON.stringify(form.members.map(m => ({ name: m.name, hero: m.hero, role: m.role }))));
+      lsSet(LK("ow-last-queue"), form.queue);
+      $("toast").textContent = `${old ? "直しました" : "記録しました"}: ${doc.map} で${resLabel(doc)}` + (notes.length ? `。${notes.join("、")}なりました` : "");
       if (old) endEdit();
-      form.result = null; setPressed($("resultSeg"), null); $("note").value = "";
-      form.members.forEach(m => m.amt = ""); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips();
+      form.result = null; setPressed($("resultSeg"), null); setPlace(null); $("note").value = "";
+      form.members.forEach(m => { m.amt = ""; m.kills = ""; m.dmg = ""; }); form.enemies = []; form.allies = []; renderMembers(); renderEnemyChips(); renderAllyChips();
     } catch (err) {
       if (err && err.code === "invalid_argument") { canWrite = false; setStatus(); $("toast").textContent = "このページへの書き込み権限がありません。持ち主に編集者として招待してもらってください。"; }
       else $("toast").textContent = "保存できませんでした。通信を確認してもう一度押してください。";
@@ -1473,14 +1608,23 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     renderDonut(t);
     let streak = 0, kind = null;
     for (let i = list.length - 1; i >= 0; i--) { const r = list[i].result; if (r === "draw") continue; if (!kind) kind = r; if (r === kind) streak++; else break; }
-    $("kpis").innerHTML = `
+    if (APEX_ON) {
+      const pl = list.filter(m => m.place), avgP = pl.length ? pl.reduce((a, m) => a + m.place, 0) / pl.length : null;
+      const sel = $("fMember").value, ks = list.flatMap(m => (m.members || []).filter(x => x.kills != null && (!sel || x.name === sel)).map(x => x.kills));
+      $("kpis").innerHTML = `
+      <div class="kpi"><div class="label">試合数</div><div class="v">${t.n}</div></div>
+      <div class="kpi"><div class="label">チャンピオン</div><div class="v win">${t.win}</div></div>
+      <div class="kpi"><div class="label">平均順位</div><div class="v">${avgP == null ? "–" : avgP.toFixed(1)}</div></div>
+      <div class="kpi"><div class="label">トップ5</div><div class="v">${pl.length ? Math.round(pl.filter(m => m.place <= 5).length / pl.length * 100) + "%" : "–"}</div></div>
+      <div class="kpi"><div class="label">平均キル</div><div class="v">${ks.length ? (ks.reduce((a, b) => a + b, 0) / ks.length).toFixed(1) : "–"}</div></div>`;
+    } else $("kpis").innerHTML = `
       <div class="kpi"><div class="label">試合数</div><div class="v">${t.n}</div></div>
       <div class="kpi"><div class="label">勝ち</div><div class="v win">${t.win}</div></div>
       <div class="kpi"><div class="label">負け</div><div class="v loss">${t.loss}</div></div>
       <div class="kpi"><div class="label">引き分け</div><div class="v">${t.draw}</div></div>
       <div class="kpi"><div class="label">いまの流れ</div><div class="v">${kind ? `${streak}<small>${kind === "win" ? "連勝" : "連敗"}</small>` : "–"}</div></div>`;
     const recent = list.slice(-40).reverse();
-    $("strip").innerHTML = recent.length ? recent.map(m => `<i class="${m.result}" title="${esc(m.date + " " + m.map + " " + RES_LABEL[m.result])}">${m.result === "win" ? "W" : m.result === "loss" ? "L" : "D"}</i>`).join("") : `<span class="empty">試合がまだありません</span>`;
+    $("strip").innerHTML = recent.length ? recent.map(m => `<i class="${m.result}" title="${esc(m.date + " " + m.map + " " + resLabel(m))}">${APEX_ON && m.place ? m.place : m.result === "win" ? "W" : m.result === "loss" ? "L" : "D"}</i>`).join("") : `<span class="empty">試合がまだありません</span>`;
 
     renderToday();
     renderLeaderboard();
@@ -1553,7 +1697,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   async function loadGlobal() {
     if (!db || !db.collectionGroup || gLoading || (gMatches && Date.now() - gLoadedAt < 60000)) return;
     gLoading = true;
-    try { const snap = await db.collectionGroup("matches").limit(5000).get(); gMatches = snap.docs.map(d => d.data()).filter(m => m.result && m.date && Array.isArray(m.uids)); gLoadedAt = Date.now(); }
+    try { const snap = await db.collectionGroup(CN("matches")).limit(5000).get(); gMatches = snap.docs.map(d => d.data()).filter(m => m.result && m.date && Array.isArray(m.uids)); gLoadedAt = Date.now(); }
     catch (e) { gMatches = []; }
     gLoading = false; renderLeaderboard();
   }
@@ -1688,7 +1832,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
         <span class="t"><span class="n">${esc(h)}</span><span class="p">${pct(t.rate)}</span></span>
         <span class="b">${wlBar(t)}<span class="r">${wlText(t)}・最後 ${esc(last.slice(5))}</span></span></div>`).join("") || `<div class="empty">ヒーローが記録されていません</div>`}</div>
       <h3>最近の試合</h3>
-      <div class="fhrecent">${recent.map(({ m, x }) => `<div class="fhm"><span class="pill ${esc(m.result)}">${RES_LABEL[m.result] || "?"}</span>${x.hero ? `<span class="fhav">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span><b>${esc(x.hero)}</b>` : `<span class="label">ヒーローなし</span>`}<span class="r">${esc(m.date.slice(5))}・${esc(m.map)}・${esc(m.queue)}</span></div>`).join("")}</div>
+      <div class="fhrecent">${recent.map(({ m, x }) => `<div class="fhm"><span class="pill ${esc(m.result)}">${resLabel(m)}</span>${x.hero ? `<span class="fhav">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span><b>${esc(x.hero)}</b>` : `<span class="label">ヒーローなし</span>`}<span class="r">${esc(m.date.slice(5))}・${esc(m.map)}・${esc(m.queue)}</span></div>`).join("")}</div>
     </div>`;
   }
   $("fhList").addEventListener("click", e => { const b = e.target.closest("[data-fh]"); if (!b) return; fhSel = b.dataset.fh; lsSet("ow-fh", fhSel); render(); });
@@ -1702,15 +1846,15 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     $("mcards").innerHTML = names.map(name => {
       const es = entriesOf(list, name), t = tally(es.map(e => e.m));
       const p = P[name] || { ranks: {} };
-      const chg = {}; es.forEach(({ x }) => { if (x.delta && x.role) chg[x.role] = (chg[x.role] || 0) + x.delta; });
+      const chg = {}; es.forEach(({ x }) => { const k = rk(x); if (x.delta && k) chg[k] = (chg[k] || 0) + x.delta; });
       const heroCount = new Map(); es.forEach(({ x }) => { if (x.hero) heroCount.set(x.hero, (heroCount.get(x.hero) || 0) + 1); });
       const tops = [...heroCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
       if (editing === name) return memberEditor(name, p);
-      const roleRows = ROLES.map(([k, ja]) => {
+      const roleRows = RANK_ROLES.map(([k, ja]) => {
         const r = p.ranks && p.ranks[k];
         const c = chg[k];
         return `<span class="rolebadge ${k}">${ja}</span>
-          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}<small class="pgn">${r.pct || 0}%</small></span><span class="pg"><span style="width:${r.pct || 0}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
+          ${validRank(r) ? `<span class="tier" style="--c:${TIERS[r.tier][1]}">${rankBadge(r, 26)}<span>${rankLabel(r)}<small class="pgn">${RANK.prog(r)[0]}</small></span><span class="pg"><span style="width:${RANK.prog(r)[1]}%"></span></span></span>` : `<span class="label">ランク未設定</span>`}
           <span class="chg ${c > 0 ? "up" : c < 0 ? "down" : ""}">${c ? sgn(c) : ""}</span>`;
       }).join("");
       return `<div class="mcard">
@@ -1725,14 +1869,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   function memberEditor(name, p) {
     return `<div class="mcard"><div class="top"><span class="nm">${esc(name)}の現在ランク</span></div>
       <div class="editor" data-name="${esc(name)}">
-        ${ROLES.map(([k, ja]) => { const r = (p.ranks || {})[k]; const v = validRank(r);
-          return `<div class="er" data-role="${k}"><span class="rolebadge ${k}">${ja}</span>
-            <select class="et" aria-label="${ja}のティア"><option value="">未設定</option>${TIER_ORDER.map(i => `<option value="${i}" ${v && r.tier === i ? "selected" : ""}>${TIERS[i][0]}</option>`).join("")}</select>
-            <select class="ed" aria-label="${ja}のディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}" ${v && r.div === d ? "selected" : ""}>${d}</option>`).join("")}</select>
-            <input type="text" inputmode="numeric" class="ep" maxlength="2" placeholder="%" value="${v ? (r.pct || 0) : ""}" aria-label="${ja}の進行度%">
-          </div>`; }).join("")}
+        ${RANK_ROLES.map(([k, ja]) => { const r = (p.ranks || {})[k];
+          return `<div class="er" data-role="${k}"><span class="rolebadge ${k}">${ja}</span>${RANK.inputs("e", r, ja, true)}</div>`; }).join("")}
         <label class="er plat"><span class="label">機種</span><select class="eplat" aria-label="機種"><option value="">未設定</option>${PLATFORMS.map(([k, l]) => `<option value="${k}" ${p.platform === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <p class="hint">ディビジョンは5が一番下、1が一番上です。右の欄は次のディビジョンまでの進み具合(0〜99%)です。</p>
+        <p class="hint">${RANK.hint}</p>
         <div class="btns"><button class="ghost" data-cancel>やめる</button><button class="ghost" data-save>保存</button></div>
       </div></div>`;
   }
@@ -1758,10 +1898,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     if (e.target.closest("[data-save]")) {
       const box = e.target.closest(".editor"), name = box.dataset.name;
       const ranks = {};
-      box.querySelectorAll(".er").forEach(row => {
-        const tv = row.querySelector(".et").value; if (tv === "") return;
-        ranks[row.dataset.role] = { tier: +tv, div: +row.querySelector(".ed").value, pct: Math.min(99, parseInt(row.querySelector(".ep").value, 10) || 0) };
-      });
+      box.querySelectorAll(".er[data-role]").forEach(row => { const r = RANK.read(row, "e"); if (r) ranks[row.dataset.role] = r; });
       const platform = box.querySelector(".eplat").value;
       try { await pcol.doc(pid(name)).set({ name, ranks, platform, updatedAt: Date.now() }); editing = null; $("toast").textContent = `${name}のランクを保存しました`; }
       catch (err) { $("toast").textContent = "ランクを保存できませんでした"; }
@@ -1791,7 +1928,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     let g = "";
     for (let v = lo; v <= hi; v += step) {
       g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" ${v === 0 ? 'stroke-width="1.5"' : 'stroke-dasharray="3 4"'}/>`;
-      g += `<text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${v > 0 ? "+" : ""}${v}%</text>`;
+      g += `<text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${v > 0 ? "+" : ""}${v}${UNIT}</text>`;
     }
     g += `<text x="${L}" y="${H - 6}">古い</text><text x="${W - R}" y="${H - 6}" text-anchor="end">新しい(ランク戦 ${ranked.length}試合)</text>`;
     // 末尾ラベルの重なりを避ける
@@ -1803,7 +1940,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ends.forEach(e => {
       const ry = Y(e.v);
       g += `<circle cx="${e.x}" cy="${ry}" r="4" fill="${e.s.color}" stroke="var(--surface)" stroke-width="2"/>`;
-      g += `<text x="${W - R + 8}" y="${e.y + 4}" style="fill:${e.s.color};font-weight:700">${e.v > 0 ? "+" : ""}${e.v}%</text>`;
+      g += `<text x="${W - R + 8}" y="${e.y + 4}" style="fill:${e.s.color};font-weight:700">${e.v > 0 ? "+" : ""}${e.v}${UNIT}</text>`;
     });
     lg.innerHTML = series.map(s => `<span class="nt" style="--c:${s.color}">${esc(s.n)}</span>`).join("");
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="メンバーごとのランク変動の累計">${g}</svg>`;
@@ -1914,9 +2051,10 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const P = curPlayers(), out = {}, run = {};
     const all = source().slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt || 0) - (a.createdAt || 0));
     all.forEach(m => (m.members || []).forEach(x => {
-      if (!x || !x.role || !x.delta) return;
-      const key = x.name + "|" + x.role;
-      if (!(key in run)) { const r = P[x.name] && P[x.name].ranks && P[x.name].ranks[x.role]; run[key] = validRank(r) ? rankTotal(r) : null; }
+      const k = x && rk(x);
+      if (!k || !x.delta) return;
+      const key = x.name + "|" + k;
+      if (!(key in run)) { const r = P[x.name] && P[x.name].ranks && P[x.name].ranks[k]; run[key] = validRank(r) ? rankTotal(r) : null; }
       if (run[key] == null) return;
       out[m.id + "|" + x.name] = fromTotal(run[key]);
       run[key] -= x.delta;
@@ -1929,11 +2067,11 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     const mini = hs => hs.map(h => `<span title="${esc(h)}">${heroEmblem(h, HERO_ROLE[h])}</span>`).join("");
     $("rows").innerHTML = rows.length ? rows.slice(0, shown).map(m => `
       <article class="hrow ${esc(m.result)}">
-        <span class="hres">${RES_LABEL[m.result] || "?"}</span>
+        <span class="hres">${resLabel(m)}</span>
         <span class="hart">${mapArt(m.map)}</span>
         <div class="hmain">
           <div class="htop"><b>${esc(m.map)}</b><span class="hmeta">${esc(m.date)} · ${esc(m.queue)}</span></div>
-          <div class="hmem"><span class="hk">フレンド</span>${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}%</b>${after[m.id + "|" + x.name] ? `<span class="hrank">${rankBadge(after[m.id + "|" + x.name], 18)}${rankLabel(after[m.id + "|" + x.name])}・${after[m.id + "|" + x.name].pct}%</span>` : ""}` : ""}</span>`).join("")}</div>
+          <div class="hmem"><span class="hk">フレンド</span>${(m.members || []).map(x => `<span class="mchip">${x.hero ? `<span class="mav" title="${esc(x.hero)}">${heroEmblem(x.hero, HERO_ROLE[x.hero])}</span>` : x.role ? `<span class="rolebadge ${esc(x.role)}">${ROLE_JA[x.role] || ""}</span>` : ""}<span class="nt">${esc(x.name)}</span>${APEX_ON && x.kills != null ? `<small class="kd">${x.kills}キル${x.dmg != null ? "・" + x.dmg : ""}</small>` : ""}${x.delta ? `<b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "▲" : "▼"}${Math.abs(x.delta)}${UNIT}</b>${after[m.id + "|" + x.name] ? `<span class="hrank">${rankBadge(after[m.id + "|" + x.name], 18)}${rankLabel(after[m.id + "|" + x.name])}・${RANK.prog(after[m.id + "|" + x.name])[0]}</span>` : ""}` : ""}</span>`).join("")}</div>
           ${(m.allies || []).length || (m.enemies || []).length ? `<div class="hteams">${(m.allies || []).length ? `<span class="hk">野良の味方</span><span class="mini">${mini(m.allies)}</span>` : ""}${(m.enemies || []).length ? `<span class="hk">相手</span><span class="mini">${mini(m.enemies)}</span>` : ""}</div>` : ""}
           ${m.note ? `<div class="hnote">${esc(m.note)}</div>` : ""}
           ${m.by || m.editedBy ? `<div class="hby">${m.by ? `記録: <span class="nt">${esc(m.by)}</span>` : ""}${m.editedBy ? ` · 編集: <span class="nt">${esc(m.editedBy)}</span>` : ""}</div>` : ""}
@@ -1949,7 +2087,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     form.result = m.result; setPressed($("resultSeg"), m.result);
     form.queue = QUEUES.includes(m.queue) ? m.queue : form.queue; syncQueue();
     if (m.map) setMap(m.map);
-    form.members = (m.members || []).slice(0, 6).map(x => ({ name: x.name, hero: x.hero || "", role: x.role || "", dir: x.delta < 0 ? -1 : 1, amt: x.delta ? String(Math.abs(x.delta)) : "" }));
+    if (APEX_ON) setPlace(m.place || null);
+    form.members = (m.members || []).slice(0, MAX_MEM).map(x => ({ name: x.name, hero: x.hero || "", role: x.role || "", dir: x.delta < 0 ? -1 : 1, amt: x.delta ? String(Math.abs(x.delta)) : "", kills: x.kills ?? "", dmg: x.dmg ?? "" }));
     form.enemies = (m.enemies || []).slice(0, 6); form.allies = (m.allies || []).slice(0, 6);
     $("note").value = m.note || "";
     $("editBar").hidden = false; $("submit").textContent = "直して保存";
@@ -2078,12 +2217,13 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   narrowMq.addEventListener("change", () => Object.keys(PAGES).forEach(applyPage));
 
   function setMode(m) {
-    mode = m === "duel" ? "duel" : "team"; lsSet("ow-mode", mode);
+    mode = m === "duel" && !APEX_ON ? "duel" : "team"; lsSet("ow-mode", mode);
     $("teamView").hidden = mode !== "team"; $("duelView").hidden = mode !== "duel";
     setPressed($("modeTabs"), mode);
     setStatus(); renderDuels();
   }
   $("modeTabs").querySelectorAll("button").forEach(b => b.dataset.v = b.dataset.mode);
+  if (APEX_ON) $("modeTabs").hidden = true;
   $("modeTabs").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
 
   // フォーム
@@ -2397,6 +2537,14 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     ["あと1つ", "ONE MORE", "하나 더"],
     ["ランクを保存しました", "Ranks saved", "랭크를 저장했습니다"],
     ["あとで", "Later", "나중에"],
+    ["ランク戦では、試合後に出るRPの増減(「+45」「−20」など)を入れると、そのメンバーの現在ランクが自動で上下します。", "In ranked, enter the RP change shown after the match (e.g. +45, −20) and that member's current rank moves automatically.", "랭크에서는 경기 후 나오는 RP 증감(+45, −20 등)을 입력하면 그 멤버의 현재 랭크가 자동으로 오르내립니다."],
+    ["いまのRP(ランクポイント)を入れてください。ティアとディビジョンは自動で決まります。", "Enter your current RP (rank points). Tier and division are set automatically.", "현재 RP(랭크 포인트)를 입력하세요. 티어와 디비전은 자동으로 정해집니다."],
+    ["いまのRP(ランクポイント)を入れてください。", "Enter your current RP (rank points).", "현재 RP(랭크 포인트)를 입력하세요."],
+    ["平均順位", "Avg. place", "평균 순위"], ["平均キル", "Avg. kills", "평균 킬"], ["トップ5", "Top 5", "톱 5"],
+    ["アサルト", "Assault", "어썰트"], ["スカーミッシャー", "Skirmisher", "스커미셔"], ["リコン", "Recon", "리콘"], ["コントローラー", "Controller", "컨트롤러"],
+    ["バトルロイヤル", "Battle Royale", "배틀로얄"], ["カジュアル", "Casual", "일반"], ["ミックステープ", "Mixtape", "믹스테이프"], ["イベント", "Event", "이벤트"],
+    ["ルーキー", "Rookie", "루키"], ["プレデター", "Predator", "프레데터"],
+    ["順位", "Place", "순위"], ["キル", "Kills", "킬"],
     ["まずはGoogleでログイン", "First, sign in with Google", "먼저 Google로 로그인"],
     ["ログインすると、自分の名前で試合を記録でき、入ったスクワッドも覚えておけます。次からは開くだけでOKです。", "Sign in to log matches under your name and keep your squads. Next time, just open the page.", "로그인하면 내 이름으로 경기를 기록하고 스쿼드도 기억됩니다. 다음부터는 열기만 하면 됩니다."],
     ["ボタンを押すだけ", "Just tap the button", "버튼만 누르면 끝"],
@@ -2597,8 +2745,16 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   I18N.forEach(([ja, en, ko]) => { exactMap[0].set(ja, en); exactMap[1].set(ja, ko); });
   const fragKeys = I18N.map(r => r[0]).filter(k => k.length >= 2).sort((a, b) => b.length - a.length);
   const fragRx = new RegExp(fragKeys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+  const WORD = APEX_ON ? [[/ヒーロー/g, "レジェンド"], [/変動%/g, "変動RP"]] : [];
+  const WORD_X = APEX_ON ? [[[/heroes/g, "legends"], [/Heroes/g, "Legends"], [/hero/g, "legend"], [/Hero/g, "Legend"]], [[/영웅/g, "레전드"]]] : [[], []];
   function tr(text) {
-    if (lang === "ja" || !text || !/[ぁ-んァ-ヶ一-龠ー]/.test(text)) return text;
+    if (!text) return text;
+    if (lang === "ja") { WORD.forEach(([rx, w]) => { text = text.replace(rx, w); }); return text; }
+    const out = trBase(text);
+    return WORD_X[LANGS[lang] - 1].reduce((o, [rx, w]) => o.replace(rx, w), out);
+  }
+  function trBase(text) {
+    if (!/[ぁ-んァ-ヶ一-龠ー]/.test(text)) return text;
     const li = LANGS[lang] - 1, m = exactMap[li], trim = text.trim();
     if (m.has(trim)) return text.replace(trim, m.get(trim));
     let out = text;
@@ -2643,7 +2799,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   let group = { id: "", name: "" }, unsubs = [];
   const gidOf = name => "g_" + [...new TextEncoder().encode(name.trim().toLowerCase())].map(b => b.toString(16).padStart(2, "0")).join("");
   const nameOfGid = gid => { try { const hex = gid.slice(2); return new TextDecoder().decode(new Uint8Array(hex.match(/../g).map(h => parseInt(h, 16)))); } catch (e) { return ""; } };
-  const colPath = n => group.id ? `groups/${group.id}/${n}` : n;
+  const CN = n => APEX_ON ? n + "_apex" : n;
+  const colPath = n => group.id ? `groups/${group.id}/${CN(n)}` : CN(n);
   function showGroup() {
     $("gName").textContent = group.id ? group.name : "OPEN LOBBY";
     $("gHint").textContent = group.id ? `コード「${group.name}」の仲間だけのGGログ。招待リンクで仲間を呼べます。` : "だれでも入れる共通ロビー。コードを決めて JOIN すると、仲間だけのスクワッドができます。";
@@ -2704,7 +2861,7 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
   function needRankSetup() {
     if (!authUser || !me || !me.name || nameEditing || !pcol || !playersReady || lsGet(rankSkipKey())) return false;
     const p = players[me.name];
-    return !(p && ROLES.some(([k]) => validRank(p.ranks[k])));
+    return !(p && RANK_ROLES.some(([k]) => validRank(p.ranks[k])));
   }
   function renderAcct() {
     const box = $("acct"); if (!auth) { box.hidden = true; return; }
@@ -2735,8 +2892,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
       return;
     }
     if (rankStep) {
-      $("aNow").innerHTML = `<span class="label">あと1つ</span><b>いまのランクを入れてください</b><span class="hint">ここが記録のスタート地点になります。試合を記録するたびに、ここからランクの上がり下がりを追いかけます。やっていないロールは「未設定」のままでOKです。</span>`;
-      $("aForm").innerHTML = `<div class="rsetup">${ROLES.map(([k, ja]) => `<div class="rsrow" data-role="${k}"><span class="rolebadge ${k}">${ja}</span><select class="rst" aria-label="${ja}のティア"><option value="">未設定</option>${TIER_ORDER.map(t => `<option value="${t}">${TIERS[t][0]}</option>`).join("")}</select><select class="rsd" aria-label="${ja}のディビジョン">${[5, 4, 3, 2, 1].map(d => `<option value="${d}">${d}</option>`).join("")}</select><input type="number" class="rsp" min="0" max="99" placeholder="%" aria-label="${ja}の進み具合(%)"></div>`).join("")}</div><button type="button" class="ghost primaryish" id="aRSave">保存</button><button type="button" class="ghost" id="aRSkip">あとで</button>`;
+      $("aNow").innerHTML = `<span class="label">あと1つ</span><b>いまのランクを入れてください</b><span class="hint">ここが記録のスタート地点になります。試合を記録するたびに、ここからランクの上がり下がりを追いかけます。${APEX_ON ? "いまのRP(ランクポイント)を入れてください。" : "やっていないロールは「未設定」のままでOKです。"}</span>`;
+      $("aForm").innerHTML = `<div class="rsetup">${RANK_ROLES.map(([k, ja]) => `<div class="rsrow" data-role="${k}"><span class="rolebadge ${k}">${ja}</span>${RANK.inputs("rs", null, ja, true)}</div>`).join("")}</div><button type="button" class="ghost primaryish" id="aRSave">保存</button><button type="button" class="ghost" id="aRSkip">あとで</button>`;
       return;
     }
     $("aNow").innerHTML = `<span class="label">PLAYER</span><b><span class="nt">${esc(me.name)}</span></b><span class="hint">${esc(authUser.email || "")}</span>`;
@@ -2760,11 +2917,8 @@ th { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
     else if (id === "aRSkip") { lsSet(rankSkipKey(), "1"); renderAcct(); }
     else if (id === "aRSave") {
       const ranks = {};
-      $("aForm").querySelectorAll(".rsrow").forEach(row => {
-        const tv = row.querySelector(".rst").value; if (tv === "") return;
-        ranks[row.dataset.role] = { tier: +tv, div: +row.querySelector(".rsd").value, pct: Math.max(0, Math.min(99, parseInt(row.querySelector(".rsp").value, 10) || 0)) };
-      });
-      if (!Object.keys(ranks).length) { $("aForm").querySelector(".rst").focus(); return; }
+      $("aForm").querySelectorAll(".rsrow").forEach(row => { const r = RANK.read(row, "rs"); if (r) ranks[row.dataset.role] = r; });
+      if (!Object.keys(ranks).length) { $("aForm").querySelector("select, input").focus(); return; }
       const p = players[me.name] || { ranks: {}, platform: "" };
       const all = { ...p.ranks, ...ranks };
       try { await pcol.doc(pid(me.name)).set({ name: me.name, ranks: all, platform: p.platform || "", updatedAt: Date.now() }); players[me.name] = { name: me.name, ranks: all, platform: p.platform || "" }; $("toast").textContent = "ランクを保存しました"; renderMembers(); renderAcct(); }
